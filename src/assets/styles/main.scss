@@ -1,0 +1,64 @@
+@use 'variables' as *;
+@use 'reset';
+@use 'typography';
+@use 'mixins' as *;
+
+body {
+  background: $color-bg;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+::selection {
+  background: $color-primary-light;
+  color: $color-text;
+}
+
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.slide-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.slide-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}

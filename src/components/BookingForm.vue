@@ -1,0 +1,368 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import AppInput from '@/components/ui/AppInput.vue'
+import ServiceCard from '@/components/ServiceCard.vue'
+import { useServices } from '@/composables/useServices'
+import { useBookings } from '@/composables/useBookings'
+import { useTimeSlots } from '@/composables/useTimeSlots'
+import { useToast } from '@/composables/useToast'
+import { getDaysAround, getDayName, getMonthDay } from '@/utils/helpers'
+
+const { activeServices, categories } = useServices()
+const { create, getByDate } = useBookings()
+const { getSlotsForDate } = useTimeSlots()
+const { show } = useToast()
+
+const step = ref<'service' | 'datetime' | 'info' | 'done'>('service')
+const selectedServiceId = ref('')
+const selectedDate = ref('')
+const selectedTime = ref('')
+const name = ref('')
+const phone = ref('')
+const comment = ref('')
+
+const selectedService = computed(() => activeServices.value.find((s) => s.id === selectedServiceId.value))
+
+const days = computed(() => getDaysAround(14))
+
+const availableSlots = computed(() => {
+  if (!selectedDate.value) return []
+  const booked = getByDate(selectedDate.value)
+    .filter((b) => b.status !== 'cancelled')
+    .map((b) => b.time)
+  return getSlotsForDate(selectedDate.value, booked)
+})
+
+function selectService(id: string) {
+  selectedServiceId.value = id
+  step.value = 'datetime'
+}
+
+function selectDateTime() {
+  if (!selectedDate.value || !selectedTime.value) return
+  step.value = 'info'
+}
+
+function submit() {
+  if (!name.value || !phone.value || !selectedService.value) return
+  create({
+    serviceId: selectedService.value.id,
+    serviceName: selectedService.value.name,
+    date: selectedDate.value,
+    time: selectedTime.value,
+    name: name.value,
+    phone: phone.value,
+    comment: comment.value,
+  })
+  step.value = 'done'
+  show('Заявка отправлена! Мы свяжемся с вами в ближайшее время.', 'success')
+}
+
+function reset() {
+  step.value = 'service'
+  selectedServiceId.value = ''
+  selectedDate.value = ''
+  selectedTime.value = ''
+  name.value = ''
+  phone.value = ''
+  comment.value = ''
+}
+
+const categoriesList = computed(() => categories.value.map((c) => ({ value: c, label: c })))
+const activeCategory = ref('')
+
+const filteredServices = computed(() => {
+  if (!activeCategory.value) return activeServices.value
+  return activeServices.value.filter((s) => s.category === activeCategory.value)
+})
+</script>
+
+<template>
+  <div class="booking-form">
+    <Transition name="slide" mode="out-in">
+      <!-- Step 1: Service Selection -->
+      <div v-if="step === 'service'" key="service" class="booking-form__step">
+        <div class="booking-form__header">
+          <h2>Выберите услугу</h2>
+          <p>Нажмите на нужную услугу, чтобы продолжить</p>
+        </div>
+        <div class="booking-form__categories">
+          <button
+            :class="['booking-form__cat-btn', { 'booking-form__cat-btn--active': !activeCategory }]"
+            @click="activeCategory = ''"
+          >
+            Все
+          </button>
+          <button
+            v-for="cat in categories"
+            :key="cat"
+            :class="['booking-form__cat-btn', { 'booking-form__cat-btn--active': activeCategory === cat }]"
+            @click="activeCategory = cat"
+          >
+            {{ cat }}
+          </button>
+        </div>
+        <div class="booking-form__services">
+          <ServiceCard
+            v-for="s in filteredServices"
+            :key="s.id"
+            :service="s"
+            :selected="selectedServiceId === s.id"
+            @select="selectService"
+          />
+        </div>
+      </div>
+
+      <!-- Step 2: Date & Time -->
+      <div v-else-if="step === 'datetime'" key="datetime" class="booking-form__step">
+        <div class="booking-form__header">
+          <h2>Выберите дату и время</h2>
+          <p>{{ selectedService?.name }}</p>
+        </div>
+        <div class="booking-form__dates">
+          <button
+            v-for="day in days"
+            :key="day"
+            :class="['booking-form__date-btn', { 'booking-form__date-btn--active': selectedDate === day }]"
+            @click="selectedDate = day"
+          >
+            <span class="booking-form__date-day">{{ getDayName(day) }}</span>
+            <span class="booking-form__date-num">{{ getMonthDay(day) }}</span>
+          </button>
+        </div>
+        <div v-if="selectedDate" class="booking-form__times">
+          <p class="booking-form__times-label">Доступное время</p>
+          <div class="booking-form__times-grid">
+            <button
+              v-for="slot in availableSlots"
+              :key="slot.time"
+              :class="['booking-form__time-btn', { 'booking-form__time-btn--active': selectedTime === slot.time }]"
+              :disabled="!slot.available"
+              @click="selectedTime = slot.time"
+            >
+              {{ slot.time }}
+            </button>
+          </div>
+        </div>
+        <div class="booking-form__nav">
+          <AppButton variant="ghost" @click="step = 'service'">Назад</AppButton>
+          <AppButton :disabled="!selectedDate || !selectedTime" @click="selectDateTime">Далее</AppButton>
+        </div>
+      </div>
+
+      <!-- Step 3: Contact Info -->
+      <div v-else-if="step === 'info'" key="info" class="booking-form__step">
+        <div class="booking-form__header">
+          <h2>Оставьте контакты</h2>
+          <p>{{ selectedService?.name }} — {{ selectedDate }} в {{ selectedTime }}</p>
+        </div>
+        <div class="booking-form__fields">
+          <AppInput v-model="name" label="Имя" placeholder="Как к вам обращаться?" />
+          <AppInput v-model="phone" label="Телефон" type="tel" placeholder="+7 (999) 123-45-67" />
+          <AppInput v-model="comment" label="Комментарий" placeholder="Пожелания к записи (необязательно)" multiline />
+        </div>
+        <div class="booking-form__nav">
+          <AppButton variant="ghost" @click="step = 'datetime'">Назад</AppButton>
+          <AppButton :disabled="!name || !phone" @click="submit">Отправить</AppButton>
+        </div>
+      </div>
+
+      <!-- Step 4: Done -->
+      <div v-else-if="step === 'done'" key="done" class="booking-form__step booking-form__step--done">
+        <div class="booking-form__success">
+          <div class="booking-form__success-icon">
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <circle cx="24" cy="24" r="24" fill="#10B981" opacity="0.1"/>
+              <path d="M16 24L22 30L32 18" stroke="#10B981" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2>Спасибо за заявку!</h2>
+          <p>Мы свяжемся с вами для подтверждения записи в ближайшее время.</p>
+          <AppButton @click="reset">Записаться ещё</AppButton>
+        </div>
+      </div>
+    </Transition>
+  </div>
+</template>
+
+<style scoped lang="scss">
+@use '@/assets/styles/variables' as *;
+@use '@/assets/styles/mixins' as *;
+
+.booking-form {
+  max-width: 640px;
+  margin: 0 auto;
+
+  &__step {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+
+    &--done {
+      align-items: center;
+      text-align: center;
+      padding: 60px 0;
+    }
+  }
+
+  &__header {
+    h2 {
+      margin-bottom: 8px;
+    }
+    p {
+      color: $color-text-secondary;
+      font-size: 15px;
+    }
+  }
+
+  &__categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  &__cat-btn {
+    padding: 8px 16px;
+    border: 1px solid $color-border;
+    border-radius: 100px;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: $color-text-secondary;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+      border-color: $color-text;
+      color: $color-text;
+    }
+
+    &--active {
+      background: $color-text;
+      border-color: $color-text;
+      color: white;
+    }
+  }
+
+  &__services {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  &__dates {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+
+  &__date-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 16px;
+    border: 1px solid $color-border;
+    border-radius: $radius-sm;
+    background: transparent;
+    cursor: pointer;
+    transition: all $transition-fast;
+    min-width: 64px;
+
+    &:hover {
+      border-color: $color-text;
+    }
+
+    &--active {
+      background: $color-text;
+      border-color: $color-text;
+      color: white;
+    }
+  }
+
+  &__date-day {
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: lowercase;
+  }
+
+  &__date-num {
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  &__times {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  &__times-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: $color-text;
+  }
+
+  &__times-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 8px;
+  }
+
+  &__time-btn {
+    padding: 10px;
+    border: 1px solid $color-border;
+    border-radius: $radius-sm;
+    background: transparent;
+    font-size: 14px;
+    font-weight: 500;
+    color: $color-text;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover:not(:disabled) {
+      border-color: $color-text;
+    }
+
+    &:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      text-decoration: line-through;
+    }
+
+    &--active {
+      background: $color-text;
+      border-color: $color-text;
+      color: white;
+    }
+  }
+
+  &__nav {
+    display: flex;
+    gap: 12px;
+    justify-content: space-between;
+    margin-top: 8px;
+  }
+
+  &__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  &__success {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  &__success-icon {
+    margin-bottom: 8px;
+  }
+}
+</style>
