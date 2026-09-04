@@ -1,9 +1,17 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
 
 const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
 const sidebarOpen = ref(false)
+
+async function logout() {
+  await auth.signOut()
+  router.push('/login')
+}
 
 const links = [
   { to: '/admin', label: 'Главная', icon: 'dashboard' },
@@ -52,6 +60,10 @@ function icon(name: string) {
         </router-link>
       </nav>
       <div class="admin-sidebar__footer">
+        <div v-if="auth.backendEnabled && auth.user" class="admin-sidebar__user">
+          <span class="admin-sidebar__email" :title="auth.user.email">{{ auth.user.email }}</span>
+          <button class="admin-sidebar__logout" @click="logout">Выйти</button>
+        </div>
         <router-link to="/" class="admin-sidebar__back">На сайт</router-link>
       </div>
     </aside>
@@ -169,6 +181,39 @@ function icon(name: string) {
     text-decoration: none;
     border-radius: $radius-sm;
     &:hover { background: $color-bg; color: $color-text; }
+  }
+
+  &__user {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    background: $color-bg;
+    border-radius: $radius-sm;
+  }
+
+  &__email {
+    font-size: 13px;
+    color: $color-text-secondary;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  &__logout {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: $color-error;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    &:hover { text-decoration: underline; }
   }
 }
 

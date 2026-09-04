@@ -2,12 +2,15 @@
 import { ref, computed } from 'vue'
 import { useTimeSlots } from '@/composables/useTimeSlots'
 import { useBookings } from '@/composables/useBookings'
+import { useAdminScope } from '@/composables/useAdminScope'
 import { getDaysAround, getDayName, getMonthDay } from '@/utils/helpers'
 import { useToast } from '@/composables/useToast'
 
-const { getSlotsForDate, toggleBlocked } = useTimeSlots()
-const { bookings: allBookings } = useBookings()
+const { cloudError, getSlotsForDate, toggleBlocked, useCloudScope: slotsScope } = useTimeSlots()
+const { bookings: allBookings, useCloudScope: bookingsScope } = useBookings()
 const { show } = useToast()
+
+useAdminScope([bookingsScope, slotsScope])
 
 const selectedDate = ref(getDaysAround(1)[0])
 
@@ -21,9 +24,13 @@ const bookedTimes = computed(() => dayBookings.value.map((b) => b.time))
 
 const slots = computed(() => getSlotsForDate(selectedDate.value, bookedTimes.value))
 
-function toggle(time: string) {
-  toggleBlocked(selectedDate.value, time)
-  show('Время обновлено', 'info')
+async function toggle(time: string) {
+  try {
+    await toggleBlocked(selectedDate.value, time)
+    show('Время обновлено', 'info')
+  } catch {
+    show(cloudError.value || 'Не получилось обновить время', 'error')
+  }
 }
 
 function statusClass(status: string) {

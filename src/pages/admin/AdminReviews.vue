@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useReviews } from '@/composables/useReviews'
+import { useAdminScope } from '@/composables/useAdminScope'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
@@ -8,8 +9,10 @@ import { useToast } from '@/composables/useToast'
 import { formatDate } from '@/utils/helpers'
 import type { Review } from '@/types'
 
-const { reviews, add, update, remove } = useReviews()
+const { reviews, cloudError, add, update, remove, useCloudScope } = useReviews()
 const { show } = useToast()
+
+useAdminScope([useCloudScope])
 
 const editingReview = ref<Review | null>(null)
 const showModal = ref(false)
@@ -33,29 +36,41 @@ function openEdit(r: Review) {
   showModal.value = true
 }
 
-function save() {
+async function save() {
   if (!form.value.name || !form.value.text) {
     show('Заполните имя и текст отзыва', 'error')
     return
   }
-  if (editingReview.value) {
-    update(editingReview.value.id, form.value)
-    show('Отзыв обновлён', 'success')
-  } else {
-    add(form.value)
-    show('Отзыв добавлен', 'success')
+  try {
+    if (editingReview.value) {
+      await update(editingReview.value.id, form.value)
+      show('Отзыв обновлён', 'success')
+    } else {
+      await add(form.value)
+      show('Отзыв добавлен', 'success')
+    }
+    showModal.value = false
+  } catch {
+    show(cloudError.value || 'Не получилось сохранить отзыв', 'error')
   }
-  showModal.value = false
 }
 
-function confirmRemove(id: string) {
-  remove(id)
-  show('Отзыв удалён', 'info')
+async function confirmRemove(id: string) {
+  try {
+    await remove(id)
+    show('Отзыв удалён', 'info')
+  } catch {
+    show(cloudError.value || 'Не получилось удалить отзыв', 'error')
+  }
 }
 
-function toggleActive(r: Review) {
-  update(r.id, { active: !r.active })
-  show(r.active ? 'Отзыв скрыт' : 'Отзыв опубликован', 'info')
+async function toggleActive(r: Review) {
+  try {
+    await update(r.id, { active: !r.active })
+    show(r.active ? 'Отзыв скрыт' : 'Отзыв опубликован', 'info')
+  } catch {
+    show(cloudError.value || 'Не получилось обновить отзыв', 'error')
+  }
 }
 
 function renderStars(rating: number) {

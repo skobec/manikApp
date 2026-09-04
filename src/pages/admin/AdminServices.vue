@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useServices } from '@/composables/useServices'
+import { useAdminScope } from '@/composables/useAdminScope'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
@@ -9,8 +10,10 @@ import { useToast } from '@/composables/useToast'
 import { formatPrice } from '@/utils/helpers'
 import type { Service } from '@/types'
 
-const { services, add, update, remove } = useServices()
+const { services, cloudError, add, update, remove, useCloudScope } = useServices()
 const { show } = useToast()
+
+useAdminScope([useCloudScope])
 
 const editingService = ref<Service | null>(null)
 const showModal = ref(false)
@@ -45,24 +48,40 @@ function openEdit(s: Service) {
   showModal.value = true
 }
 
-function save() {
+async function save() {
   if (!form.value.name || !form.value.price) {
     show('Заполните обязательные поля', 'error')
     return
   }
-  if (editingService.value) {
-    update(editingService.value.id, form.value)
-    show('Услуга обновлена', 'success')
-  } else {
-    add(form.value)
-    show('Услуга добавлена', 'success')
+  try {
+    if (editingService.value) {
+      await update(editingService.value.id, form.value)
+      show('Услуга обновлена', 'success')
+    } else {
+      await add(form.value)
+      show('Услуга добавлена', 'success')
+    }
+    showModal.value = false
+  } catch {
+    show(cloudError.value || 'Не получилось сохранить услугу', 'error')
   }
-  showModal.value = false
 }
 
-function confirmRemove(id: string) {
-  remove(id)
-  show('Услуга удалена', 'info')
+async function confirmRemove(id: string) {
+  try {
+    await remove(id)
+    show('Услуга удалена', 'info')
+  } catch {
+    show(cloudError.value || 'Не получилось удалить услугу', 'error')
+  }
+}
+
+async function toggleService(s: Service) {
+  try {
+    await update(s.id, { active: !s.active })
+  } catch {
+    show(cloudError.value || 'Не получилось обновить услугу', 'error')
+  }
 }
 </script>
 
@@ -90,7 +109,7 @@ function confirmRemove(id: string) {
         </div>
         <div class="admin-services__item-actions">
           <AppButton size="sm" variant="secondary" @click="openEdit(s)">Ред.</AppButton>
-          <AppButton size="sm" variant="ghost" @click="update(s.id, { active: !s.active })">
+          <AppButton size="sm" variant="ghost" @click="toggleService(s)">
             {{ s.active ? 'Деакт.' : 'Акт.' }}
           </AppButton>
           <AppButton size="sm" variant="danger" @click="confirmRemove(s.id)">Удал.</AppButton>

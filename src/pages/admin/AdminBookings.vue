@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useBookings } from '@/composables/useBookings'
+import { useAdminScope } from '@/composables/useAdminScope'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import { useToast } from '@/composables/useToast'
 import { formatDate } from '@/utils/helpers'
 
-const { bookings, updateStatus, remove: removeBooking } = useBookings()
+const { bookings, cloudError, updateStatus, remove: removeBooking, useCloudScope } = useBookings()
 const { show } = useToast()
 
-const filter = ref<'all' | 'pending' | 'confirmed' | 'cancelled'>('all')
+useAdminScope([useCloudScope])
+
+const filter = ref<'all' | 'pending' | 'confirmed' | 'completed' | 'cancelled'>('all')
 
 const filtered = computed(() => {
   if (filter.value === 'all') return bookings.value
@@ -18,20 +21,32 @@ const filtered = computed(() => {
 
 const confirmModal = ref<{ open: boolean; bookingId: string }>({ open: false, bookingId: '' })
 
-function confirmBooking(id: string) {
-  updateStatus(id, 'confirmed')
-  show('Запись подтверждена', 'success')
+async function confirmBooking(id: string) {
+  try {
+    await updateStatus(id, 'confirmed')
+    show('Запись подтверждена', 'success')
+  } catch {
+    show(cloudError.value || 'Не получилось обновить запись', 'error')
+  }
 }
 
-function cancelBooking(id: string) {
-  updateStatus(id, 'cancelled')
-  show('Запись отменена', 'error')
+async function cancelBooking(id: string) {
+  try {
+    await updateStatus(id, 'cancelled')
+    show('Запись отменена', 'error')
+  } catch {
+    show(cloudError.value || 'Не получилось обновить запись', 'error')
+  }
 }
 
-function deleteBooking(id: string) {
-  removeBooking(id)
-  confirmModal.value = { open: false, bookingId: '' }
-  show('Запись удалена', 'info')
+async function deleteBooking(id: string) {
+  try {
+    await removeBooking(id)
+    confirmModal.value = { open: false, bookingId: '' }
+    show('Запись удалена', 'info')
+  } catch {
+    show(cloudError.value || 'Не получилось удалить запись', 'error')
+  }
 }
 
 function openDeleteConfirm(id: string) {
@@ -42,6 +57,7 @@ function statusLabel(status: string) {
   switch (status) {
     case 'pending': return 'Новая'
     case 'confirmed': return 'Подтверждена'
+    case 'completed': return 'Завершена'
     case 'cancelled': return 'Отменена'
     default: return status
   }
@@ -51,6 +67,7 @@ function statusClass(status: string) {
   switch (status) {
     case 'pending': return 'admin-bookings__status--pending'
     case 'confirmed': return 'admin-bookings__status--confirmed'
+    case 'completed': return 'admin-bookings__status--completed'
     case 'cancelled': return 'admin-bookings__status--cancelled'
     default: return ''
   }
@@ -63,6 +80,7 @@ function statusClass(status: string) {
       <button :class="['admin-bookings__filter', { 'admin-bookings__filter--active': filter === 'all' }]" @click="filter = 'all'">Все</button>
       <button :class="['admin-bookings__filter', { 'admin-bookings__filter--active': filter === 'pending' }]" @click="filter = 'pending'">Новые</button>
       <button :class="['admin-bookings__filter', { 'admin-bookings__filter--active': filter === 'confirmed' }]" @click="filter = 'confirmed'">Подтверждённые</button>
+      <button :class="['admin-bookings__filter', { 'admin-bookings__filter--active': filter === 'completed' }]" @click="filter = 'completed'">Завершённые</button>
       <button :class="['admin-bookings__filter', { 'admin-bookings__filter--active': filter === 'cancelled' }]" @click="filter = 'cancelled'">Отменённые</button>
     </div>
 
@@ -210,6 +228,7 @@ function statusClass(status: string) {
 
     &--pending { background: #FEF3C7; color: #D97706; }
     &--confirmed { background: #D1FAE5; color: #059669; }
+    &--completed { background: #DBEAFE; color: #2563EB; }
     &--cancelled { background: #FEE2E2; color: #DC2626; }
   }
 }

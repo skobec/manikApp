@@ -3,12 +3,15 @@ import { useBookings } from '@/composables/useBookings'
 import { useServices } from '@/composables/useServices'
 import { useReviews } from '@/composables/useReviews'
 import { useGallery } from '@/composables/useGallery'
+import { useAdminScope } from '@/composables/useAdminScope'
 import { computed } from 'vue'
 
-const { bookings } = useBookings()
-const { activeServices } = useServices()
-const { activeReviews } = useReviews()
-const { items } = useGallery()
+const { bookings, useCloudScope: bookingsScope } = useBookings()
+const { activeServices, useCloudScope: servicesScope } = useServices()
+const { activeReviews, useCloudScope: reviewsScope } = useReviews()
+const { items, useCloudScope: galleryScope } = useGallery()
+
+useAdminScope([bookingsScope, servicesScope, reviewsScope, galleryScope])
 
 const pendingBookings = computed(() => bookings.value.filter((b) => b.status === 'pending'))
 const todayBookings = computed(() => {

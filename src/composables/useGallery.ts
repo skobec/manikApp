@@ -3,8 +3,13 @@ import type { GalleryItem } from '@/types'
 import { storage } from '@/services/storage'
 import { defaultGallery } from '@/data/gallery'
 import { generateId } from '@/utils/helpers'
+import { isSupabaseEnabled } from '@/services/supabase'
+import { listWorks, createWork, deleteWork } from '@/services/repositories/media'
+import { ruError } from '@/utils/errors'
 
 const items = ref<GalleryItem[]>([])
+const cloudBusinessId = ref<string | null>(null)
+const cloudError = ref('')
 
 function load() {
   const saved = storage.getAll<GalleryItem>('gallery')
@@ -16,30 +21,76 @@ function load() {
 
 load()
 
+function isCloud(): boolean {
+  return cloudBusinessId.value !== null && isSupabaseEnabled()
+}
+
 export function useGallery() {
-  function add(item: Omit<GalleryItem, 'id'>) {
+  async function useCloudScope(businessId: string) {
+    cloudBusinessId.value = businessId
+    await reload()
+  }
+
+  function useLocalScope() {
+    cloudBusinessId.value = null
+    load()
+  }
+
+  async function reload() {
+    if (!isCloud()) return
+    cloudError.value = ''
+    try {
+      items.value = await listWorks(cloudBusinessId.value as string)
+    } catch (e) {
+      cloudError.value = ruError(e instanceof Error ? e.message : '')
+    }
+  }
+
+  async function add(item: Omit<GalleryItem, 'id'>) {
+    if (isCloud()) {
+      cloudError.value = ''
+      try {
+        const created = await createWork(cloudBusinessId.value as string, item.src)
+        items.value.push(created)
+        return created
+      } catch (e) {
+        cloudError.value = ruError(e instanceof Error ? e.message : '')
+        throw e
+      }
+    }
     const newItem: GalleryItem = { ...item, id: generateId() }
     items.value.push(newItem)
     save()
     return newItem
   }
 
-  function update(id: string, updates: Partial<GalleryItem>) {
+  async function update(id: string, updates: Partial<GalleryItem>) {
+    // В cloud-режиме media — только url (остальное маппится), поэтому
+    // обновление полей карточки не поддерживается и применяется локально к ref.
     const index = items.value.findIndex((i) => i.id === id)
     if (index !== -1) {
       items.value[index] = { ...items.value[index], ...updates }
-      save()
+      if (!isCloud()) save()
     }
   }
 
-  function remove(id: string) {
+  async function remove(id: string) {
+    if (isCloud()) {
+      cloudError.value = ''
+      try {
+        await deleteWork(id)
+      } catch (e) {
+        cloudError.value = ruError(e instanceof Error ? e.message : '')
+        throw e
+      }
+    }
     items.value = items.value.filter((i) => i.id !== id)
-    save()
+    if (!isCloud()) save()
   }
 
   function save() {
     storage.set('gallery', items.value)
   }
 
-  return { items, add, update, remove, load }
+  return { items, cloudError, add, update, remove, load, useCloudScope, useLocalScope, reload }
 }

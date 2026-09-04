@@ -36,12 +36,29 @@ export interface Booking {
   phone: string
   comment: string
   createdAt: string
-  status: 'pending' | 'confirmed' | 'cancelled'
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled'
 }
 
 export interface TimeSlot {
   time: string
   available: boolean
+}
+
+export interface Business {
+  id: string
+  owner_id: string | null
+  name: string
+  slug: string
+  description: string
+  phone: string
+  email: string
+  city: string
+  address: string
+  timezone: string
+  avatar_url: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
 }
 
 export interface BusinessInfo {

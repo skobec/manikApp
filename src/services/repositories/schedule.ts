@@ -1,0 +1,109 @@
+import { supabase } from '@/services/supabase'
+import { defaultTimeSlots } from '@/data/timeSlots'
+import type { TimeSlot } from '@/types'
+
+export interface WorkingHoursRow {
+  business_id: string
+  weekday: number // 0 = воскресенье … 6 = суббота
+  open_time: string | null // 'HH:MM:SS'
+  close_time: string | null
+  is_day_off: boolean
+}
+
+export interface BlockedPeriodRow {
+  business_id: string
+  start_at: string
+  end_at: string
+  reason: string | null
+}
+
+function requireClient() {
+  if (!supabase) throw new Error('Supabase не подключён.')
+  return supabase
+}
+
+export async function getWorkingHours(businessId: string): Promise<WorkingHoursRow[]> {
+  const { data, error } = await requireClient()
+    .from('working_hours')
+    .select('*')
+    .eq('business_id', businessId)
+  if (error) throw new Error(error.message)
+  return (data ?? []) as WorkingHoursRow[]
+}
+
+export async function getBlockedPeriods(businessId: string): Promise<BlockedPeriodRow[]> {
+  const { data, error } = await requireClient()
+    .from('blocked_periods')
+    .select('*')
+    .eq('business_id', businessId)
+    .order('start_at', { ascending: true })
+  if (error) throw new Error(error.message)
+  return (data ?? []) as BlockedPeriodRow[]
+}
+
+// Шаблон слотов на дату: из working_hours (часовая сетка) или дефолт 09:00–20:00.
+export function buildTemplate(hours: WorkingHoursRow[], dateISO: string): TimeSlot[] {
+  const weekday = new Date(dateISO + 'T12:00:00').getDay()
+  const day = hours.find((h) => h.weekday === weekday)
+  if (!day || day.is_day_off || !day.open_time || !day.close_time) {
+    return day?.is_day_off ? [] : defaultTimeSlots.map((s) => ({ ...s }))
+  }
+  const open = Number(day.open_time.slice(0, 2))
+  const close = Number(day.close_time.slice(0, 2))
+  const slots: TimeSlot[] = []
+  for (let h = open; h < close; h++) {
+    slots.push({ time: `${String(h).padStart(2, '0')}:00`, available: true })
+  }
+  return slots
+}
+
+// Какие часовые слоты даты пересекаются с blocked_periods.
+export function blockedTimesForDate(periods: BlockedPeriodRow[], dateISO: string): string[] {
+  const dayStart = new Date(dateISO + 'T00:00:00').getTime()
+  const result: string[] = []
+  for (let h = 0; h < 24; h++) {
+    const slotStart = dayStart + h * 3600000
+    const slotEnd = slotStart + 3600000
+    const hit = periods.some((p) => {
+      const s = new Date(p.start_at).getTime()
+      const e = new Date(p.end_at).getTime()
+      return s < slotEnd && e > slotStart
+    })
+    if (hit) result.push(`${String(h).padStart(2, '0')}:00`)
+  }
+  return result
+}
+
+export async function blockHour(businessId: string, dateISO: string, time: string): Promise<void> {
+  const [h, m] = time.split(':').map(Number)
+  const start = new Date(dateISO + 'T00:00:00')
+  start.setHours(h, m || 0, 0, 0)
+  const end = new Date(start.getTime() + 3600000)
+  const { error } = await requireClient().from('blocked_periods').insert({
+    business_id: businessId,
+    start_at: start.toISOString(),
+    end_at: end.toISOString(),
+    reason: 'Заблокировано мастером',
+  })
+  if (error) throw new Error(error.message)
+}
+
+// Снимаем блокировку: удаляем периоды, пересекающиеся с часом.
+export async function unblockHour(businessId: string, dateISO: string, time: string): Promise<void> {
+  const periods = await getBlockedPeriods(businessId)
+  const [h, m] = time.split(':').map(Number)
+  const start = new Date(dateISO + 'T00:00:00')
+  start.setHours(h, m || 0, 0, 0)
+  const slotStart = start.getTime()
+  const slotEnd = slotStart + 3600000
+  const client = requireClient()
+  const ids: string[] = []
+  for (const p of periods as (BlockedPeriodRow & { id: string })[]) {
+    const s = new Date(p.start_at).getTime()
+    const e = new Date(p.end_at).getTime()
+    if (s < slotEnd && e > slotStart) ids.push(p.id)
+  }
+  if (ids.length === 0) return
+  const { error } = await client.from('blocked_periods').delete().in('id', ids)
+  if (error) throw new Error(error.message)
+}

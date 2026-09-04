@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useGallery } from '@/composables/useGallery'
+import { useAdminScope } from '@/composables/useAdminScope'
+import { useAuthStore } from '@/stores/authStore'
+import { isSupabaseEnabled } from '@/services/supabase'
+import { uploadWorkImage } from '@/services/repositories/media'
+import { fileToResizedDataUrl } from '@/utils/image'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
@@ -8,8 +13,37 @@ import AppSelect from '@/components/ui/AppSelect.vue'
 import { useToast } from '@/composables/useToast'
 import type { GalleryItem } from '@/types'
 
-const { items, add, update, remove } = useGallery()
+const { items, cloudError, add, update, remove, useCloudScope } = useGallery()
 const { show } = useToast()
+const auth = useAuthStore()
+
+useAdminScope([useCloudScope])
+
+const isCloud = computed(() => isSupabaseEnabled() && !!auth.business)
+const uploading = ref(false)
+const uploadError = ref('')
+
+async function onFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  uploadError.value = ''
+  uploading.value = true
+  try {
+    if (isCloud.value && auth.business) {
+      form.value.src = await uploadWorkImage(auth.business.id, file)
+      show('Фото загружено в облако', 'success')
+    } else {
+      form.value.src = await fileToResizedDataUrl(file)
+      show('Фото добавлено (хранится локально)', 'success')
+    }
+  } catch (err) {
+    uploadError.value = err instanceof Error ? err.message : 'Не получилось загрузить фото'
+  } finally {
+    uploading.value = false
+  }
+}
 
 const editingItem = ref<GalleryItem | null>(null)
 const showModal = ref(false)
@@ -40,24 +74,32 @@ function openEdit(item: GalleryItem) {
   showModal.value = true
 }
 
-function save() {
-  if (!form.value.alt) {
-    show('Заполните название', 'error')
+async function save() {
+  if (!form.value.src && !form.value.alt) {
+    show('Добавьте ссылку на фото или название работы', 'error')
     return
   }
-  if (editingItem.value) {
-    update(editingItem.value.id, form.value)
-    show('Работа обновлена', 'success')
-  } else {
-    add(form.value)
-    show('Работа добавлена', 'success')
+  try {
+    if (editingItem.value) {
+      await update(editingItem.value.id, form.value)
+      show('Работа обновлена', 'success')
+    } else {
+      await add(form.value)
+      show('Работа добавлена', 'success')
+    }
+    showModal.value = false
+  } catch {
+    show(cloudError.value || 'Не получилось сохранить работу', 'error')
   }
-  showModal.value = false
 }
 
-function confirmRemove(id: string) {
-  remove(id)
-  show('Работа удалена', 'info')
+async function confirmRemove(id: string) {
+  try {
+    await remove(id)
+    show('Работа удалена', 'info')
+  } catch {
+    show(cloudError.value || 'Не получилось удалить работу', 'error')
+  }
 }
 </script>
 
@@ -94,7 +136,16 @@ function confirmRemove(id: string) {
       <div style="display:flex; flex-direction:column; gap:16px;">
         <AppInput v-model="form.alt" label="Название" placeholder="Описание работы" />
         <AppInput v-model="form.description" label="Описание" placeholder="Полное описание" multiline />
-        <AppInput v-model="form.src" label="URL изображения" placeholder="https://..." />
+        <div class="upload-box">
+          <label :class="['upload-box__btn', { 'upload-box__btn--busy': uploading }]">
+            {{ uploading ? 'Загружаем…' : (isCloud ? 'Загрузить фото в облако' : 'Выбрать фото с устройства') }}
+            <input type="file" accept="image/*" hidden :disabled="uploading" @change="onFile" />
+          </label>
+          <p class="upload-box__hint">{{ isCloud ? 'JPG/PNG/WebP до 5 МБ' : 'Ужмём автоматически для localStorage' }}</p>
+          <p v-if="uploadError" class="upload-box__error">{{ uploadError }}</p>
+          <img v-if="form.src" :src="form.src" alt="Превью" class="upload-box__preview" />
+        </div>
+        <AppInput v-model="form.src" label="URL изображения (или загрузите выше)" placeholder="https://..." />
         <AppSelect v-model="form.category" label="Категория" :options="categoryOptions" />
         <AppInput v-model="form.date" label="Дата" type="date" />
         <div style="display:flex; gap: 12px; justify-content:flex-end; margin-top:8px;">
@@ -173,6 +224,54 @@ function confirmRemove(id: string) {
     display: flex;
     gap: 8px;
     padding: 8px 12px 12px;
+  }
+}
+
+.upload-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  &__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 16px;
+    border: 1px dashed $color-border-hover;
+    border-radius: $radius-sm;
+    font-size: 14px;
+    font-weight: 500;
+    color: $color-text;
+    cursor: pointer;
+    transition: all $transition-fast;
+
+    &:hover {
+      border-color: $color-text;
+      background: $color-bg;
+    }
+
+    &--busy {
+      opacity: 0.6;
+      pointer-events: none;
+    }
+  }
+
+  &__hint {
+    font-size: 12px;
+    color: $color-text-tertiary;
+  }
+
+  &__error {
+    font-size: 13px;
+    color: $color-error;
+  }
+
+  &__preview {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: $radius-sm;
+    border: 1px solid $color-border;
   }
 }
 </style>
