@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import ServiceCard from '@/components/ServiceCard.vue'
@@ -7,11 +7,26 @@ import { useServices } from '@/composables/useServices'
 import { useBookings } from '@/composables/useBookings'
 import { useTimeSlots } from '@/composables/useTimeSlots'
 import { useToast } from '@/composables/useToast'
+import { isSupabaseEnabled } from '@/services/supabase'
+import { listServices } from '@/services/repositories/services'
+import { listAppointments, createAppointment } from '@/services/repositories/bookings'
+import { ruError } from '@/utils/errors'
 import { getDaysAround, getDayName, getMonthDay } from '@/utils/helpers'
+import type { Service, Booking } from '@/types'
+
+export interface BookingContext {
+  businessId: string
+  businessName: string
+  timezone: string
+}
+
+const props = defineProps<{ context?: BookingContext | null }>()
+
+const cloud = computed(() => !!props.context && isSupabaseEnabled())
 
 const { activeServices, categories } = useServices()
 const { create, getByDate } = useBookings()
-const { getSlotsForDate } = useTimeSlots()
+const timeSlots = useTimeSlots()
 const { show } = useToast()
 
 const step = ref<'service' | 'datetime' | 'info' | 'done'>('service')
@@ -22,16 +37,61 @@ const name = ref('')
 const phone = ref('')
 const comment = ref('')
 
-const selectedService = computed(() => activeServices.value.find((s) => s.id === selectedServiceId.value))
+const cloudServices = ref<Service[]>([])
+const cloudBookings = ref<Booking[]>([])
+const cloudLoading = ref(false)
+const submitError = ref('')
+
+async function loadCloud() {
+  if (!cloud.value || !props.context) return
+  cloudLoading.value = true
+  try {
+    const [s, b] = await Promise.all([
+      listServices(props.context.businessId),
+      listAppointments(props.context.businessId, props.context.timezone),
+    ])
+    cloudServices.value = s
+    cloudBookings.value = b
+    await timeSlots.useCloudScope(props.context.businessId)
+  } catch (e) {
+    show(ruError(e instanceof Error ? e.message : ''), 'error')
+  } finally {
+    cloudLoading.value = false
+  }
+}
+
+onMounted(loadCloud)
+watch(
+  () => props.context?.businessId,
+  () => {
+    selectedServiceId.value = ''
+    selectedDate.value = ''
+    selectedTime.value = ''
+    loadCloud()
+  },
+)
+
+const serviceList = computed(() =>
+  cloud.value ? cloudServices.value.filter((s) => s.active) : activeServices.value,
+)
+
+const allCategories = computed(() => {
+  const cats = new Set(serviceList.value.map((s) => s.category))
+  return Array.from(cats)
+})
+
+const selectedService = computed(() => serviceList.value.find((s) => s.id === selectedServiceId.value))
 
 const days = computed(() => getDaysAround(14))
 
 const availableSlots = computed(() => {
   if (!selectedDate.value) return []
-  const booked = getByDate(selectedDate.value)
-    .filter((b) => b.status !== 'cancelled')
-    .map((b) => b.time)
-  return getSlotsForDate(selectedDate.value, booked)
+  const booked = (
+    cloud.value
+      ? cloudBookings.value.filter((b) => b.date === selectedDate.value && b.status !== 'cancelled')
+      : getByDate(selectedDate.value).filter((b) => b.status !== 'cancelled')
+  ).map((b) => b.time)
+  return timeSlots.getSlotsForDate(selectedDate.value, booked)
 })
 
 function selectService(id: string) {
@@ -44,17 +104,39 @@ function selectDateTime() {
   step.value = 'info'
 }
 
-function submit() {
+async function submit() {
+  submitError.value = ''
   if (!name.value || !phone.value || !selectedService.value) return
-  create({
-    serviceId: selectedService.value.id,
-    serviceName: selectedService.value.name,
-    date: selectedDate.value,
-    time: selectedTime.value,
-    name: name.value,
-    phone: phone.value,
-    comment: comment.value,
-  })
+  const svc = selectedService.value
+  if (cloud.value && props.context) {
+    try {
+      await createAppointment(props.context.businessId, {
+        serviceId: svc.id,
+        date: selectedDate.value,
+        time: selectedTime.value,
+        durationMinutes: svc.duration,
+        timezone: props.context.timezone,
+        name: name.value,
+        phone: phone.value,
+        comment: comment.value,
+      })
+      cloudBookings.value = await listAppointments(props.context.businessId, props.context.timezone)
+    } catch (e) {
+      submitError.value = ruError(e instanceof Error ? e.message : '')
+      show(submitError.value, 'error')
+      return
+    }
+  } else {
+    create({
+      serviceId: svc.id,
+      serviceName: svc.name,
+      date: selectedDate.value,
+      time: selectedTime.value,
+      name: name.value,
+      phone: phone.value,
+      comment: comment.value,
+    })
+  }
   step.value = 'done'
   show('Заявка отправлена! Мы свяжемся с вами в ближайшее время.', 'success')
 }
@@ -67,19 +149,24 @@ function reset() {
   name.value = ''
   phone.value = ''
   comment.value = ''
+  submitError.value = ''
 }
 
-const categoriesList = computed(() => categories.value.map((c) => ({ value: c, label: c })))
 const activeCategory = ref('')
 
 const filteredServices = computed(() => {
-  if (!activeCategory.value) return activeServices.value
-  return activeServices.value.filter((s) => s.category === activeCategory.value)
+  if (!activeCategory.value) return serviceList.value
+  return serviceList.value.filter((s) => s.category === activeCategory.value)
 })
+
+// В local-режиме категории берём из composable (тот же источник, что serviceList).
+const localCategories = categories
+const shownCategories = computed(() => (cloud.value ? allCategories.value : localCategories.value))
 </script>
 
 <template>
   <div class="booking-form">
+    <p v-if="cloud && props.context" class="booking-form__studio">{{ props.context.businessName }}</p>
     <Transition name="slide" mode="out-in">
       <!-- Step 1: Service Selection -->
       <div v-if="step === 'service'" key="service" class="booking-form__step">
@@ -87,31 +174,37 @@ const filteredServices = computed(() => {
           <h2>Выберите услугу</h2>
           <p>Нажмите на нужную услугу, чтобы продолжить</p>
         </div>
-        <div class="booking-form__categories">
-          <button
-            :class="['booking-form__cat-btn', { 'booking-form__cat-btn--active': !activeCategory }]"
-            @click="activeCategory = ''"
-          >
-            Все
-          </button>
-          <button
-            v-for="cat in categories"
-            :key="cat"
-            :class="['booking-form__cat-btn', { 'booking-form__cat-btn--active': activeCategory === cat }]"
-            @click="activeCategory = cat"
-          >
-            {{ cat }}
-          </button>
-        </div>
-        <div class="booking-form__services">
-          <ServiceCard
-            v-for="s in filteredServices"
-            :key="s.id"
-            :service="s"
-            :selected="selectedServiceId === s.id"
-            @select="selectService"
-          />
-        </div>
+        <div v-if="cloudLoading" class="booking-form__loading">Загружаем услуги…</div>
+        <template v-else>
+          <div class="booking-form__categories">
+            <button
+              :class="['booking-form__cat-btn', { 'booking-form__cat-btn--active': !activeCategory }]"
+              @click="activeCategory = ''"
+            >
+              Все
+            </button>
+            <button
+              v-for="cat in shownCategories"
+              :key="cat"
+              :class="['booking-form__cat-btn', { 'booking-form__cat-btn--active': activeCategory === cat }]"
+              @click="activeCategory = cat"
+            >
+              {{ cat }}
+            </button>
+          </div>
+          <div class="booking-form__services">
+            <ServiceCard
+              v-for="s in filteredServices"
+              :key="s.id"
+              :service="s"
+              :selected="selectedServiceId === s.id"
+              @select="selectService"
+            />
+          </div>
+          <p v-if="filteredServices.length === 0" class="booking-form__empty">
+            Услуги пока не добавлены. Загляните позже.
+          </p>
+        </template>
       </div>
 
       <!-- Step 2: Date & Time -->
@@ -125,7 +218,7 @@ const filteredServices = computed(() => {
             v-for="day in days"
             :key="day"
             :class="['booking-form__date-btn', { 'booking-form__date-btn--active': selectedDate === day }]"
-            @click="selectedDate = day"
+            @click="selectedDate = day; selectedTime = ''"
           >
             <span class="booking-form__date-day">{{ getDayName(day) }}</span>
             <span class="booking-form__date-num">{{ getMonthDay(day) }}</span>
@@ -162,6 +255,7 @@ const filteredServices = computed(() => {
           <AppInput v-model="phone" label="Телефон" type="tel" placeholder="+7 (999) 123-45-67" />
           <AppInput v-model="comment" label="Комментарий" placeholder="Пожелания к записи (необязательно)" multiline />
         </div>
+        <p v-if="submitError" class="booking-form__submit-error">{{ submitError }}</p>
         <div class="booking-form__nav">
           <AppButton variant="ghost" @click="step = 'datetime'">Назад</AppButton>
           <AppButton :disabled="!name || !phone" @click="submit">Отправить</AppButton>
@@ -194,6 +288,15 @@ const filteredServices = computed(() => {
   max-width: 640px;
   margin: 0 auto;
 
+  &__studio {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: $color-text-tertiary;
+    margin-bottom: 16px;
+  }
+
   &__step {
     display: flex;
     flex-direction: column;
@@ -214,6 +317,13 @@ const filteredServices = computed(() => {
       color: $color-text-secondary;
       font-size: 15px;
     }
+  }
+
+  &__loading,
+  &__empty {
+    padding: 40px 0;
+    text-align: center;
+    color: $color-text-tertiary;
   }
 
   &__categories {
@@ -352,6 +462,11 @@ const filteredServices = computed(() => {
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  &__submit-error {
+    font-size: 14px;
+    color: $color-error;
   }
 
   &__success {

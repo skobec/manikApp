@@ -1,18 +1,70 @@
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import HeroSection from '@/components/HeroSection.vue'
 import ServiceCard from '@/components/ServiceCard.vue'
 import GalleryCard from '@/components/GalleryCard.vue'
 import ReviewCard from '@/components/ReviewCard.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import { business } from '@/config/business'
+import { isSupabaseEnabled } from '@/services/supabase'
+import { getBusinessBySlug } from '@/services/repositories/businesses'
+import { listServices } from '@/services/repositories/services'
+import { listReviews } from '@/services/repositories/reviews'
+import { listWorks } from '@/services/repositories/media'
 import { useServices } from '@/composables/useServices'
 import { useGallery } from '@/composables/useGallery'
 import { useReviews } from '@/composables/useReviews'
+import type { Service, Review, GalleryItem } from '@/types'
 
 const router = useRouter()
-const { activeServices } = useServices()
-const { items } = useGallery()
-const { activeReviews } = useReviews()
+const cloud = isSupabaseEnabled()
+const featuredSlug = business.featuredSlug
+
+// Local-режим: демо-данные. Cloud: витрина флагманской студии.
+const localServices = useServices()
+const localGallery = useGallery()
+const localReviews = useReviews()
+
+const cloudReady = ref(false)
+const cloudServices = ref<Service[]>([])
+const cloudWorks = ref<GalleryItem[]>([])
+const cloudReviews = ref<Review[]>([])
+
+const services = computed(() =>
+  cloudReady.value ? cloudServices.value.filter((s) => s.active) : localServices.activeServices.value,
+)
+const works = computed(() => (cloudReady.value ? cloudWorks.value : localGallery.items.value))
+const reviews = computed(() =>
+  cloudReady.value ? cloudReviews.value.filter((r) => r.active) : localReviews.activeReviews.value,
+)
+
+onMounted(async () => {
+  if (!cloud) return
+  try {
+    const found = await getBusinessBySlug(featuredSlug)
+    if (!found) return
+    const [s, w, r] = await Promise.all([
+      listServices(found.id),
+      listWorks(found.id),
+      listReviews(found.id),
+    ])
+    cloudServices.value = s
+    cloudWorks.value = w
+    cloudReviews.value = r
+    cloudReady.value = true
+  } catch {
+    // Флагман не найден или сеть недоступна — показываем демо-данные.
+  }
+})
+
+function goStudio() {
+  router.push(`/${featuredSlug}`)
+}
+
+function goBooking() {
+  router.push(`/${featuredSlug}/booking`)
+}
 </script>
 
 <template>
@@ -20,7 +72,7 @@ const { activeReviews } = useReviews()
     <HeroSection />
 
     <!-- Services Preview -->
-    <section class="home__section">
+    <section v-if="services.length > 0" class="home__section">
       <div class="home__container">
         <div class="home__section-header">
           <span class="home__badge">Услуги</span>
@@ -29,20 +81,20 @@ const { activeReviews } = useReviews()
         </div>
         <div class="home__services-grid">
           <ServiceCard
-            v-for="s in activeServices.slice(0, 4)"
+            v-for="s in services.slice(0, 4)"
             :key="s.id"
             :service="s"
-            @select="router.push('/booking')"
+            @select="goBooking"
           />
         </div>
         <div class="home__section-action">
-          <AppButton variant="secondary" @click="router.push('/prices')">Все услуги и цены</AppButton>
+          <AppButton variant="secondary" @click="goStudio">Все услуги и цены</AppButton>
         </div>
       </div>
     </section>
 
     <!-- Gallery Preview -->
-    <section class="home__section home__section--alt">
+    <section v-if="works.length > 0" class="home__section home__section--alt">
       <div class="home__container">
         <div class="home__section-header">
           <span class="home__badge">Портфолио</span>
@@ -50,26 +102,26 @@ const { activeReviews } = useReviews()
           <p>Примеры дизайнов и покрытий</p>
         </div>
         <div class="home__gallery-grid">
-          <GalleryCard v-for="item in items.slice(0, 4)" :key="item.id" :item="item" />
+          <GalleryCard v-for="item in works.slice(0, 4)" :key="item.id" :item="item" />
         </div>
         <div class="home__section-action">
-          <AppButton variant="secondary" @click="router.push('/gallery')">Вся галерея</AppButton>
+          <AppButton variant="secondary" @click="goStudio">Вся галерея</AppButton>
         </div>
       </div>
     </section>
 
     <!-- Reviews Preview -->
-    <section class="home__section">
+    <section v-if="reviews.length > 0" class="home__section">
       <div class="home__container">
         <div class="home__section-header">
           <span class="home__badge">Отзывы</span>
           <h2>Что говорят клиенты</h2>
         </div>
         <div class="home__reviews-grid">
-          <ReviewCard v-for="r in activeReviews.slice(0, 3)" :key="r.id" :review="r" />
+          <ReviewCard v-for="r in reviews.slice(0, 3)" :key="r.id" :review="r" />
         </div>
         <div class="home__section-action">
-          <AppButton variant="secondary" @click="router.push('/reviews')">Все отзывы</AppButton>
+          <AppButton variant="secondary" @click="goStudio">Все отзывы</AppButton>
         </div>
       </div>
     </section>
@@ -80,7 +132,7 @@ const { activeReviews } = useReviews()
         <div class="home__cta">
           <h2>Запишитесь прямо сейчас</h2>
           <p>Оставьте заявку и мы подберём удобное время</p>
-          <AppButton size="lg" @click="router.push('/booking')">Записаться онлайн</AppButton>
+          <AppButton size="lg" @click="goBooking">Записаться онлайн</AppButton>
         </div>
       </div>
     </section>

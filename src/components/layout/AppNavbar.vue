@@ -1,19 +1,18 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+import { business } from '@/config/business'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const mobileOpen = ref(false)
 const isScrolled = ref(false)
 
 const links = [
   { to: '/', label: 'Главная' },
-  { to: '/gallery', label: 'Работы' },
-  { to: '/prices', label: 'Цены' },
-  { to: '/reviews', label: 'Отзывы' },
-  { to: '/contacts', label: 'Контакты' },
-  { to: '/booking', label: 'Запись' },
+  { to: '/masters', label: 'Мастерам' },
 ]
 
 watch(
@@ -27,7 +26,7 @@ onMounted(() => {
 })
 
 function goBooking() {
-  router.push('/booking')
+  router.push(`/${business.featuredSlug}/booking`)
 }
 </script>
 
@@ -51,6 +50,8 @@ function goBooking() {
       </nav>
 
       <div class="navbar__actions">
+        <router-link v-if="!auth.user" to="/login" class="navbar__login">Войти</router-link>
+        <router-link v-else to="/admin" class="navbar__login">Кабинет</router-link>
         <button class="navbar__book-btn" @click="goBooking">Записаться</button>
         <button class="navbar__burger" @click="mobileOpen = !mobileOpen" aria-label="Меню">
           <span class="navbar__burger-line" />
@@ -71,6 +72,8 @@ function goBooking() {
         >
           {{ link.label }}
         </router-link>
+        <router-link v-if="!auth.user" to="/login" class="navbar__mobile-link">Войти</router-link>
+        <router-link v-else to="/admin" class="navbar__mobile-link">Кабинет</router-link>
       </div>
     </Transition>
   </header>
@@ -152,6 +155,26 @@ function goBooking() {
     @include button-primary;
     padding: 8px 18px;
     font-size: 13px;
+
+    @include mobile {
+      display: none;
+    }
+  }
+
+  &__login {
+    padding: 8px 14px;
+    border-radius: $radius-sm;
+    font-size: 14px;
+    font-weight: 500;
+    color: $color-text-secondary;
+    text-decoration: none;
+    transition: all $transition-fast;
+    white-space: nowrap;
+
+    &:hover {
+      color: $color-text;
+      background: rgba(0,0,0,0.04);
+    }
 
     @include mobile {
       display: none;

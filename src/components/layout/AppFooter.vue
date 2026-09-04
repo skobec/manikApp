@@ -13,10 +13,9 @@ const year = new Date().getFullYear()
         <div class="footer__col">
           <h4 class="footer__title">Навигация</h4>
           <router-link to="/" class="footer__link">Главная</router-link>
-          <router-link to="/gallery" class="footer__link">Работы</router-link>
-          <router-link to="/prices" class="footer__link">Цены</router-link>
-          <router-link to="/reviews" class="footer__link">Отзывы</router-link>
-          <router-link to="/contacts" class="footer__link">Контакты</router-link>
+          <router-link to="/masters" class="footer__link">Мастерам</router-link>
+          <router-link to="/login" class="footer__link">Войти</router-link>
+          <router-link to="/register" class="footer__link">Регистрация</router-link>
         </div>
         <div class="footer__col">
           <h4 class="footer__title">Контакты</h4>

@@ -16,14 +16,23 @@ MVP современного сайта с онлайн-записью, адми
 
 ---
 
+## Требования
+
+- Node.js 20+
+- npm 10+
+
 ## Запуск
 
 ```bash
 npm install
-npm run dev       # разработка на localhost:5173
+cp .env.example .env.local   # опционально: свои название/slug/таймзона (дефолты уже вшиты)
+npm run dev       # разработка на http://localhost:5173
 npm run build     # production-сборка в dist/
-npm run preview   # превью собранного проекта
+npm run preview   # превью собранного проекта (проверка перед деплоем)
 ```
+
+Проверка готовности к запуску: `npm run build` должен завершиться без ошибок
+(внутри уже сидят проверка типов `vue-tsc` и сборка Vite).
 
 ---
 
@@ -87,6 +96,8 @@ src/
 │       ├── AdminReviews.vue      # /admin/reviews
 │       └── AdminCalendar.vue     # /admin/calendar
 │
+├── config/
+│   └── business.ts        # Single-tenant конфиг: slug/name/timezone из env (шов под multi-tenant)
 ├── router/index.ts        # Маршрутизация (ленивая загрузка)
 ├── services/storage.ts    # Абстракция над localStorage
 ├── stores/                # Pinia-стори
@@ -105,13 +116,14 @@ src/
 
 | Путь | Описание |
 |------|----------|
-| `/` | Главная с превью услуг, работ, отзывов и CTA |
-| `/gallery` | Портфолио с фильтрацией по категориям |
-| `/prices` | Прайс-лист, сгруппированный по категориям |
-| `/reviews` | Отзывы клиентов |
-| `/contacts` | Контакты, адрес, соцсети, режим работы |
-| `/booking` | Онлайн-запись в 4 шага (услуга → дата/время → контакты → готово) |
-| `/admin` | Дашборд со статистикой |
+| `/` | Флагманская студия (твой салон, slug из `VITE_FEATURED_SLUG`) |
+| `/:slug` | Публичная страница студии: профиль, услуги, цены, работы, отзывы, контакты |
+| `/:slug/booking` | Онлайн-запись в 4 шага (услуга → дата/время → контакты → готово) |
+| `/masters` | Лендинг платформы для мастеров (регистрация, пример студии) |
+| `/login` | Вход мастера (Supabase Auth; без бэкенда — заглушка с подсказкой) |
+| `/register` | Регистрация мастера (с экраном «проверьте почту», если включено подтверждение) |
+| `/onboarding` | Создание студии: название, slug, город, часовой пояс → строка в `businesses` |
+| `/admin` | Дашборд со статистикой (guard: без сессии → `/login`) |
 | `/admin/bookings` | Управление записями (подтверждение, отмена, удаление) |
 | `/admin/services` | Управление услугами и ценами |
 | `/admin/gallery` | Управление портфолио |
@@ -124,22 +136,82 @@ src/
 
 Все данные хранятся в **localStorage** через сервис `services/storage.ts`.
 
-Ключи в localStorage:
+Ключи в localStorage (префикс `manik_`):
 - `manik_bookings` — записи клиентов
 - `manik_services` — услуги
 - `manik_gallery` — галерея
 - `manik_reviews` — отзывы
-- `manik_blockedTimes` — заблокированные админом временные слоты
+- `manik_blockedTimes` — заблокированные админом временные слоты по датам
+
+Сброс демо-данных: очисти localStorage в DevTools (Application → Local Storage)
+и перезагрузи страницу — моковые данные из `src/data/` подставятся заново.
 
 ---
 
-## Подключение Supabase (в будущем)
+## Environment variables
 
-Архитектура спроектирована так, чтобы backend подключался без переписывания фронтенда:
+| Переменная | Дефолт | Назначение |
+|---|---|---|
+| `VITE_APP_NAME` | `Nail Studio` | Название в `<title>` и интерфейсе |
+| `VITE_BUSINESS_SLUG` | `nail-studio` | Slug бизнеса, задел под `/[slug]` |
+| `VITE_FEATURED_SLUG` | `nail-studio` | Какая студия открывается на `/` (твой салон) |
+| `VITE_BUSINESS_TIMEZONE` | `Europe/Moscow` | Таймзона мастера |
+| `VITE_USE_SUPABASE` | — (выкл.) | `'true'` — использовать Supabase, иначе localStorage |
+| `VITE_SUPABASE_URL` | — | URL бесплатного проекта Supabase |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | — | Публичный ключ `sb_publishable_*` (secret — никогда) |
 
-1. В `services/storage.ts` заменить вызовы `localStorage` на `supabase.from('table')...`
-2. Композаблы (`useBookings`, `useServices`, и т.д.) не меняются — они уже работают через `storage`
-3. Компоненты не меняются — они уже работают через композаблы
+Файл `.env.local` игнорируется гитом (см. `.gitignore`: `*.local`).
+Секреты никогда не коммитятся — образец без значений лежит в `.env.example`.
+
+---
+
+## Деплой
+
+Проект — статическое SPA (`dist/` после `npm run build`). Сборка переносимая
+(`base: './'`, роутер от `BASE_URL`): один `dist/` работает и в корне домена,
+и в подпути вида `/user/repo/`.
+
+| Хостинг | Цена | SPA-роутинг | Комментарий |
+|---|---|---|---|
+| **Cloudflare Pages** (рекомендую) | $0 | из коробки (`public/_redirects`) | Быстрый CDN, без карты, custom-домен бесплатно |
+| **Vercel** | $0 (Hobby) | из коробки (`vercel.json`) | `git push` → деплой; нужен импорт репозитория |
+| **Netlify** | $0 | из коробки (`public/_redirects`) | Аналог Vercel |
+| **GitHub Pages** | $0 | через трюк `404.html` | Workflow уже в `.github/workflows/deploy-pages.yml`: сборка → копия `index.html` в `404.html` → публикация. Включить: Settings → Pages → Source: GitHub Actions. URL будет `https://<user>.github.io/<repo>/` |
+
+Без fallback `/booking`, `/admin` дадут 404 при прямом открытии/обновлении —
+это особенность `createWebHistory()`, а не баг.
+
+`public/robots.txt` разрешает индексацию публичных страниц и закрывает `/admin/`.
+
+### RU-зона: что важно знать
+
+- Все четыре варианта выше бесплатны, карты не требуют и открываются из РФ.
+  RU-хостеры (Timeweb, Beget и т.п.) для статики — как правило платные от первого дня,
+  бесплатного forever-тарифа под статический SPA у них нет, поэтому для MVP они не нужны.
+- Домен `.ru` — платный (покупается у регистратора), любой из хостингов выше
+  позволяет привязать свой домен бесплатно. На старте достаточно бесплатного
+  поддомена хостинга (`*.pages.dev`, `*.vercel.app`, `*.github.io`).
+- Бэкенд Supabase Free: регистрация без карты; регион проекта выбирай
+  ближайший к клиентам (`West EU` / `Central EU`). Нюанс тарифа: проект засыпает
+  после недели без активности — будится одной кнопкой в Dashboard.
+
+---
+
+## Бэкенд: бесплатный Supabase (multi-tenant по AGENTS.md)
+
+Готово уже сейчас, без переписывания фронтенда:
+
+- `src/services/supabase.ts` — клиент, `null` пока нет ключей (фолбэк localStorage);
+- `supabase/migrations/0001_init.sql` — схема: `businesses`, `services`,
+  `clients`, `appointments`, `working_hours`, `blocked_periods`, `reviews`,
+  `media` + серверный триггер против двойной записи + RLS + бакеты Storage;
+- **`docs/supabase-setup.md` — пошаговая инструкция**: аккаунт → проект Free →
+  SQL-миграция → бизнес+владелец → `.env.local` → деплой-переменные,
+  плюс чек-лист задач Phase B (репозитории, Auth UI, загрузка фото, тест RLS).
+
+Принцип сохраняется: composables ходят в данные только через `services/`,
+компоненты — только через composables, поэтому подключение бэкенда
+не требует переписывания UI.
 
 ---
 
@@ -158,7 +230,6 @@ src/
 
 ```bash
 npm run dev       # Запуск dev-сервера
-npm run build     # Сборка в dist/
+npm run build     # Проверка типов + сборка в dist/
 npm run preview   # Просмотр собранного проекта
-npm run lint      # Линтинг (если настроен)
 ```

@@ -1,9 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { business } from '@/config/business'
+import { useAuthStore } from '@/stores/authStore'
+import { isSupabaseEnabled } from '@/services/supabase'
 
-const DEFAULT_TITLE = 'Nail Studio — маникюр на каждый день'
+const DEFAULT_TITLE = `${business.name} — маникюр на каждый день`
+const featured = business.featuredSlug
 
 const router = createRouter({
-  history: createWebHistory(),
+  // BASE_URL подхватывает base из vite.config.ts — роутер корректно
+  // работает и в корне домена, и в подпути GitHub Pages.
+  history: createWebHistory(import.meta.env.BASE_URL),
   scrollBehavior() {
     return { top: 0 }
   },
@@ -12,6 +18,7 @@ const router = createRouter({
       path: '/',
       component: () => import('@/components/layout/AppLayout.vue'),
       children: [
+        // Главная — витрина флагманской студии (твой салон).
         {
           path: '',
           name: 'home',
@@ -19,40 +26,63 @@ const router = createRouter({
           meta: { title: 'Главная' },
         },
         {
-          path: 'gallery',
-          name: 'gallery',
-          component: () => import('@/pages/GalleryPage.vue'),
-          meta: { title: 'Работы' },
+          path: 'masters',
+          name: 'masters',
+          component: () => import('@/pages/MastersPage.vue'),
+          meta: { title: 'Мастерам' },
         },
         {
-          path: 'prices',
-          name: 'prices',
-          component: () => import('@/pages/PricesPage.vue'),
-          meta: { title: 'Цены' },
+          path: 'login',
+          name: 'login',
+          component: () => import('@/pages/LoginPage.vue'),
+          meta: { title: 'Вход' },
         },
         {
-          path: 'reviews',
-          name: 'reviews',
-          component: () => import('@/pages/ReviewsPage.vue'),
-          meta: { title: 'Отзывы' },
+          path: 'register',
+          name: 'register',
+          component: () => import('@/pages/RegisterPage.vue'),
+          meta: { title: 'Регистрация' },
         },
         {
-          path: 'contacts',
-          name: 'contacts',
-          component: () => import('@/pages/ContactsPage.vue'),
-          meta: { title: 'Контакты' },
+          path: 'onboarding',
+          name: 'onboarding',
+          component: () => import('@/pages/OnboardingPage.vue'),
+          meta: { title: 'Создание студии' },
+        },
+        // Legacy одностраничного сайта → флагман и 404.
+        { path: 'booking', redirect: `/${featured}/booking` },
+        { path: 'gallery', redirect: '/' },
+        { path: 'prices', redirect: '/' },
+        { path: 'reviews', redirect: '/' },
+        { path: 'contacts', redirect: '/' },
+        // Публичная страница студии и её запись. Статичные роуты выше,
+        // поэтому /login, /admin и т.п. сюда не попадают.
+        {
+          path: ':slug',
+          name: 'studio',
+          component: () => import('@/pages/StudioPage.vue'),
+          props: true,
+          meta: { title: 'Студия' },
         },
         {
-          path: 'booking',
-          name: 'booking',
+          path: ':slug/booking',
+          name: 'studio-booking',
           component: () => import('@/pages/BookingPage.vue'),
+          props: true,
           meta: { title: 'Запись онлайн' },
+        },
+        {
+          path: ':pathMatch(.*)*',
+          name: 'not-found',
+          component: () => import('@/pages/NotFoundPage.vue'),
+          meta: { title: 'Страница не найдена' },
         },
       ],
     },
     {
       path: '/admin',
       component: () => import('@/pages/admin/AdminLayout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -92,16 +122,25 @@ const router = createRouter({
         },
       ],
     },
-    {
-      path: '/:pathMatch(.*)*',
-      redirect: '/',
-    },
   ],
+})
+
+router.beforeEach(async (to) => {
+  const needsAuth = to.matched.some((r) => r.meta.requiresAuth)
+  const isOnboarding = to.path === '/onboarding'
+  if (!needsAuth && !isOnboarding) return true
+  // Local-режим без бэкенда: админка открыта как раньше.
+  if (!isSupabaseEnabled()) return true
+  const auth = useAuthStore()
+  if (!auth.initialized) await auth.init()
+  if (!auth.user) return { path: '/login', query: { redirect: to.fullPath } }
+  if (isOnboarding && auth.business) return { path: '/admin' }
+  return true
 })
 
 router.afterEach((to) => {
   const title = to.meta?.title
-    ? `${to.meta.title} | Nail Studio`
+    ? `${to.meta.title} | ${business.name}`
     : DEFAULT_TITLE
   document.title = title
 

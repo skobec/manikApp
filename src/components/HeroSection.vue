@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { business } from '@/config/business'
 
 const router = useRouter()
 </script>
@@ -17,8 +18,8 @@ const router = useRouter()
           Профессиональный маникюр и педикюр в уютной студии. Индивидуальный подход, качественные материалы и безупречный результат.
         </p>
         <div class="hero__actions">
-          <button class="hero__btn-primary" @click="router.push('/booking')">Записаться онлайн</button>
-          <button class="hero__btn-secondary" @click="router.push('/gallery')">Смотреть работы</button>
+          <button class="hero__btn-primary" @click="router.push(`/${business.featuredSlug}/booking`)">Записаться онлайн</button>
+          <button class="hero__btn-secondary" @click="router.push(`/${business.featuredSlug}`)">Смотреть работы</button>
         </div>
       </div>
       <div class="hero__visual">
