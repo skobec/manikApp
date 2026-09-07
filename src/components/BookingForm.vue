@@ -11,10 +11,12 @@ import { useTimeSlots } from '@/composables/useTimeSlots'
 import { useToast } from '@/composables/useToast'
 import { isSupabaseEnabled } from '@/services/supabase'
 import { listServices } from '@/services/repositories/services'
-import { listAppointments, createAppointment } from '@/services/repositories/bookings'
+import { getDayTimes, createBookingGuest, type DayTimes } from '@/services/repositories/bookings'
+import { getWorkingHours, buildTemplate, type WorkingHoursRow } from '@/services/repositories/schedule'
 import { ruError } from '@/utils/errors'
 import { getDaysAround, getDayName, getMonthDay } from '@/utils/helpers'
-import type { Service, Booking } from '@/types'
+import type { Service } from '@/types'
+import type { TimeSlot } from '@/types'
 
 export interface BookingContext {
   businessId: string
@@ -40,10 +42,14 @@ const phone = ref('')
 const comment = ref('')
 
 const cloudServices = ref<Service[]>([])
-const cloudBookings = ref<Booking[]>([])
 const cloudLoading = ref(false)
 const submitError = ref('')
 const phoneError = ref('')
+
+// Cloud-данные занятости: шаблон из working_hours + занятые/заблокированные
+// часы даты через RPC (гостю таблицы напрямую недоступны — приватность).
+const hoursCache = ref<WorkingHoursRow[] | null>(null)
+const dayTimes = ref<DayTimes | null>(null)
 
 // --- Антиспам ---
 // honeypot: человек поле не видит и не заполняет, бот — заполняет.
@@ -56,17 +62,27 @@ async function loadCloud() {
   if (!cloud.value || !props.context) return
   cloudLoading.value = true
   try {
-    const [s, b] = await Promise.all([
+    const [s, h] = await Promise.all([
       listServices(props.context.businessId),
-      listAppointments(props.context.businessId, props.context.timezone),
+      getWorkingHours(props.context.businessId),
     ])
     cloudServices.value = s
-    cloudBookings.value = b
-    await timeSlots.useCloudScope(props.context.businessId)
+    hoursCache.value = h
   } catch (e) {
     show(ruError(e instanceof Error ? e.message : ''), 'error')
   } finally {
     cloudLoading.value = false
+  }
+}
+
+async function loadDayTimes(date: string) {
+  dayTimes.value = null
+  selectedTime.value = ''
+  if (!cloud.value || !props.context || !date) return
+  try {
+    dayTimes.value = await getDayTimes(props.context.businessId, date, props.context.timezone)
+  } catch (e) {
+    show(ruError(e instanceof Error ? e.message : ''), 'error')
   }
 }
 
@@ -77,9 +93,12 @@ watch(
     selectedServiceId.value = ''
     selectedDate.value = ''
     selectedTime.value = ''
+    hoursCache.value = null
+    dayTimes.value = null
     loadCloud()
   },
 )
+watch(selectedDate, (d) => loadDayTimes(d))
 
 const serviceList = computed(() =>
   cloud.value ? cloudServices.value.filter((s) => s.active) : activeServices.value,
@@ -94,13 +113,19 @@ const selectedService = computed(() => serviceList.value.find((s) => s.id === se
 
 const days = computed(() => getDaysAround(14))
 
-const availableSlots = computed(() => {
+const availableSlots = computed<TimeSlot[]>(() => {
   if (!selectedDate.value) return []
-  const booked = (
-    cloud.value
-      ? cloudBookings.value.filter((b) => b.date === selectedDate.value && b.status !== 'cancelled')
-      : getByDate(selectedDate.value).filter((b) => b.status !== 'cancelled')
-  ).map((b) => b.time)
+  if (cloud.value) {
+    const template = buildTemplate(hoursCache.value ?? [], selectedDate.value)
+    const unavailable = new Set([
+      ...(dayTimes.value?.booked ?? []),
+      ...(dayTimes.value?.blocked ?? []),
+    ])
+    return template.map((s) => ({ ...s, available: !unavailable.has(s.time) }))
+  }
+  const booked = getByDate(selectedDate.value)
+    .filter((b) => b.status !== 'cancelled')
+    .map((b) => b.time)
   return timeSlots.getSlotsForDate(selectedDate.value, booked)
 })
 
@@ -134,7 +159,7 @@ async function submit() {
   const svc = selectedService.value
   if (cloud.value && props.context) {
     try {
-      await createAppointment(props.context.businessId, {
+      await createBookingGuest(props.context.businessId, {
         serviceId: svc.id,
         date: selectedDate.value,
         time: selectedTime.value,
@@ -144,7 +169,13 @@ async function submit() {
         phone: phone.value,
         comment: comment.value,
       })
-      cloudBookings.value = await listAppointments(props.context.businessId, props.context.timezone)
+      // Мгновенно гасим слот в UI, не дожидаясь перезапроса.
+      if (dayTimes.value) {
+        dayTimes.value = {
+          ...dayTimes.value,
+          booked: [...dayTimes.value.booked, selectedTime.value],
+        }
+      }
     } catch (e) {
       submitError.value = ruError(e instanceof Error ? e.message : '')
       show(submitError.value, 'error')

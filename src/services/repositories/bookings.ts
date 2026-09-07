@@ -182,6 +182,80 @@ export async function createAppointment(businessId: string, input: AppointmentIn
   return mapAppointment(data as AppointmentRow)
 }
 
+export interface DayTimes {
+  booked: string[]
+  blocked: string[]
+}
+
+// Публичный доступ к занятости даты (без PII): какие часы заняты
+// записями, а какие заблокированы мастером. Работает и для anon.
+export async function getDayTimes(
+  businessId: string,
+  dateISO: string,
+  timezone: string,
+): Promise<DayTimes> {
+  const { data, error } = await requireClient().rpc('get_day_times', {
+    p_business_id: businessId,
+    p_date: dateISO,
+    p_timezone: timezone,
+  })
+  if (error) throw new Error(error.message)
+  const d = (data ?? {}) as { booked?: string[]; blocked?: string[] }
+  return { booked: d.booked ?? [], blocked: d.blocked ?? [] }
+}
+
+export interface GuestBookingInput {
+  serviceId: string
+  date: string
+  time: string
+  durationMinutes: number
+  timezone: string
+  name: string
+  phone: string
+  comment: string
+}
+
+// Гостевая запись с сайта (anon): find-or-create клиента, вставка записи,
+// пересечения ловит серверный триггер (SLOT_TAKEN). PII других клиентов
+// гостю недоступны — в ответе только его собственная запись.
+export async function createBookingGuest(
+  businessId: string,
+  input: GuestBookingInput,
+): Promise<Booking> {
+  const { data, error } = await requireClient().rpc('create_booking', {
+    p_business_id: businessId,
+    p_service_id: input.serviceId,
+    p_date: input.date,
+    p_time: input.time,
+    p_duration_minutes: input.durationMinutes,
+    p_timezone: input.timezone,
+    p_name: input.name.trim(),
+    p_phone: input.phone,
+    p_comment: input.comment.trim(),
+  })
+  if (error) throw new Error(error.message)
+  const r = data as {
+    id: string
+    service_name: string
+    date: string
+    time: string
+    name: string
+    phone: string
+  }
+  return {
+    id: r.id,
+    serviceId: input.serviceId,
+    serviceName: r.service_name,
+    date: r.date,
+    time: r.time,
+    name: input.name,
+    phone: input.phone,
+    comment: input.comment,
+    createdAt: new Date().toISOString(),
+    status: 'pending',
+  }
+}
+
 export async function updateAppointmentStatus(id: string, status: CloudStatus): Promise<void> {
   const { error } = await requireClient().from('appointments').update({ status }).eq('id', id)
   if (error) throw new Error(error.message)

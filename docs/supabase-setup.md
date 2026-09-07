@@ -25,10 +25,14 @@
 ## Шаг 2. Применить схему БД (~3 минуты)
 
 - [ ] В проекте открыть **SQL Editor → New query**.
-- [ ] Вставить целиком `supabase/migrations/0001_init.sql` из этого репозитория → **Run**.
+- [ ] По очереди вставить целиком и выполнить (**Run**) все миграции из
+      `supabase/migrations/`: `0001_init.sql`, `0002_service_category.sql`,
+      `0003_telegram_notifications.sql`, `0004_guest_booking_rpc.sql`.
+      0004 обязательна: без неё публичная запись не работает (гостям закрыт
+      прямой доступ к чужим данным, всё идёт через RPC).
 - [ ] Проверить: Table Editor показывает таблицы `businesses`, `services`,
       `clients`, `appointments`, `working_hours`, `blocked_periods`,
-      `reviews`, `media`. Повторный прогон безопасен.
+      `reviews`, `media`, `notification_settings`. Повторный прогон безопасен.
 
 Что уже внутри миграции:
 - все сущности с `business_id` (multi-tenant по AGENTS.md §6);
