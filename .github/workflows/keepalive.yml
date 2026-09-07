@@ -1,0 +1,29 @@
+# Не даём бесплатному Supabase заснуть: несколько лёгких чтений в сутки.
+# По докам для бодрствования достаточно «a few user requests to the database
+# each day» — делаем 3 захода × 2 запроса, этого с запасом хватает.
+# Ключ publishable — публичный, поэтому храним в Variables, а не в Secrets.
+#
+# Настройка (2 минуты, один раз):
+#   Settings → Secrets and variables → Actions → Variables → New:
+#     SUPABASE_URL = https://xxx.supabase.co
+#     SUPABASE_PUBLISHABLE_KEY = sb_publishable_...
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: '20 6,14,22 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          for table in businesses services; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "apikey: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}" \
+              -H "Authorization: Bearer ${{ vars.SUPABASE_PUBLISHABLE_KEY }}" \
+              "${{ vars.SUPABASE_URL }}/rest/v1/${table}?select=id&limit=1")
+            echo "${table}: ${code}"
+            test "$code" = "200"
+          done

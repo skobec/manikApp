@@ -115,6 +115,12 @@ const router = createRouter({
           component: () => import('@/pages/admin/AdminNotifications.vue'),
           meta: { title: 'Уведомления' },
         },
+        {
+          path: 'profile',
+          name: 'admin-profile',
+          component: () => import('@/pages/admin/AdminProfile.vue'),
+          meta: { title: 'Профиль' },
+        },
       ],
     },
   ],
