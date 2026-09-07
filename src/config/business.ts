@@ -20,8 +20,8 @@ function env(key: string, fallback: string): string {
 }
 
 export const business: BusinessConfig = {
-  slug: env('VITE_BUSINESS_SLUG', 'nail-studio'),
-  name: env('VITE_APP_NAME', 'Nail Studio'),
+  slug: env('VITE_BUSINESS_SLUG', 'didinails'),
+  name: env('VITE_APP_NAME', 'DiDiNails'),
   timezone: env('VITE_BUSINESS_TIMEZONE', 'Europe/Moscow'),
-  featuredSlug: env('VITE_FEATURED_SLUG', 'nail-studio'),
+  featuredSlug: env('VITE_FEATURED_SLUG', 'didinails'),
 }

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { business } from '@/config/business'
+import logoUrl from '@/assets/logo.svg'
+
 const year = new Date().getFullYear()
 </script>
 
@@ -7,7 +10,10 @@ const year = new Date().getFullYear()
     <div class="footer__inner">
       <div class="footer__grid">
         <div class="footer__col">
-          <h4 class="footer__title">Nail Studio</h4>
+          <h4 class="footer__title footer__brand">
+            <img :src="logoUrl" :alt="business.name" class="footer__logo-img" />
+            {{ business.name }}
+          </h4>
           <p class="footer__text">Профессиональный маникюр и педикюр. Работаем с душой и любим своё дело.</p>
         </div>
         <div class="footer__col">
@@ -21,13 +27,13 @@ const year = new Date().getFullYear()
         <div class="footer__col">
           <h4 class="footer__title">Контакты</h4>
           <a href="tel:+79991234567" class="footer__link">+7 (999) 123-45-67</a>
-          <a href="mailto:hello@nailstudio.ru" class="footer__link">hello@nailstudio.ru</a>
+          <a href="mailto:hello@didinails.ru" class="footer__link">hello@didinails.ru</a>
           <a href="https://instagram.com" target="_blank" class="footer__link">Instagram</a>
           <a href="https://t.me" target="_blank" class="footer__link">Telegram</a>
         </div>
       </div>
       <div class="footer__bottom">
-        <p class="footer__copyright">&copy; {{ year }} Nail Studio. Все права защищены.</p>
+        <p class="footer__copyright">&copy; {{ year }} {{ business.name }}. Все права защищены.</p>
       </div>
     </div>
   </footer>
@@ -68,6 +74,18 @@ const year = new Date().getFullYear()
   &__title {
     font-size: 16px;
     margin-bottom: 4px;
+  }
+
+  &__brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__logo-img {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
   }
 
   &__text {

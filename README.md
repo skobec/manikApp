@@ -1,4 +1,4 @@
-# Nail Studio — сайт для частного мастера маникюра
+# DiDiNails — сайт для частного мастера маникюра
 
 MVP современного сайта с онлайн-записью, админ-панелью и архитектурой, готовой к подключению Supabase.
 
@@ -162,9 +162,9 @@ src/
 
 | Переменная | Дефолт | Назначение |
 |---|---|---|
-| `VITE_APP_NAME` | `Nail Studio` | Название в `<title>` и интерфейсе |
-| `VITE_BUSINESS_SLUG` | `nail-studio` | Slug бизнеса, задел под `/[slug]` |
-| `VITE_FEATURED_SLUG` | `nail-studio` | Какая студия открывается на `/` (твой салон) |
+| `VITE_APP_NAME` | `DiDiNails` | Название в `<title>` и интерфейсе |
+| `VITE_BUSINESS_SLUG` | `didinails` | Slug бизнеса, задел под `/[slug]` |
+| `VITE_FEATURED_SLUG` | `didinails` | Какая студия открывается на `/` (твой салон) |
 | `VITE_BUSINESS_TIMEZONE` | `Europe/Moscow` | Таймзона мастера |
 | `VITE_USE_SUPABASE` | — (выкл.) | `'true'` — использовать Supabase, иначе localStorage |
 | `VITE_SUPABASE_URL` | — | URL бесплатного проекта Supabase |

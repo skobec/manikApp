@@ -2,6 +2,8 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { business } from '@/config/business'
+import logoUrl from '@/assets/logo.svg'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,7 +52,10 @@ function icon(name: string) {
   <div class="admin-layout">
     <aside :class="['admin-sidebar', { 'admin-sidebar--open': sidebarOpen }]">
       <div class="admin-sidebar__header">
-        <router-link to="/admin" class="admin-sidebar__logo">Nail Studio Admin</router-link>
+        <router-link to="/admin" class="admin-sidebar__logo">
+          <img :src="logoUrl" :alt="business.name" class="admin-sidebar__logo-img" />
+          {{ business.name }}
+        </router-link>
       </div>
       <nav class="admin-sidebar__nav">
         <router-link
@@ -134,10 +139,19 @@ function icon(name: string) {
   }
 
   &__logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     font-size: 18px;
     font-weight: 700;
     text-decoration: none;
     color: $color-text;
+  }
+
+  &__logo-img {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
   }
 
   &__nav {

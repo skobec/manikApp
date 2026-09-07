@@ -12,7 +12,7 @@ const cloud = isSupabaseEnabled()
 const biz = ref<Business | null>(null)
 
 const phone = computed(() => (cloud ? (biz.value?.phone ?? '') : '+7 (999) 123-45-67'))
-const email = computed(() => (cloud ? (biz.value?.email ?? '') : 'hello@nailstudio.ru'))
+const email = computed(() => (cloud ? (biz.value?.email ?? '') : 'hello@didinails.ru'))
 const address = computed(() => {
   if (!cloud) return 'г. Москва, ул. Тверская, д. 15'
   const parts = [biz.value?.city, biz.value?.address].filter(Boolean)

@@ -2,6 +2,8 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { business } from '@/config/business'
+import logoUrl from '@/assets/logo.svg'
 
 const route = useRoute()
 const router = useRouter()
@@ -37,7 +39,8 @@ function goBooking() {
   <header :class="['navbar', { 'navbar--scrolled': isScrolled }]">
     <div class="navbar__inner">
       <router-link to="/" class="navbar__logo">
-        <span class="navbar__logo-text">Nail Studio</span>
+        <img :src="logoUrl" :alt="business.name" class="navbar__logo-img" />
+        <span class="navbar__logo-text">{{ business.name }}</span>
       </router-link>
 
       <nav class="navbar__links">
@@ -109,7 +112,16 @@ function goBooking() {
   }
 
   &__logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     text-decoration: none;
+  }
+
+  &__logo-img {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
   }
 
   &__logo-text {
