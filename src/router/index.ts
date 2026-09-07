@@ -53,12 +53,25 @@ const router = createRouter({
           component: () => import('@/pages/BookingPage.vue'),
           meta: { title: 'Запись онлайн' },
         },
-        // Вход только для владельца (публичной регистрации в v1 нет).
+        // Вход только для владельца. Публичной регистрации и ссылок на неё
+        // в меню нет; /register — скрытая одноразовая настройка владельца.
         {
           path: 'login',
           name: 'login',
           component: () => import('@/pages/LoginPage.vue'),
           meta: { title: 'Вход' },
+        },
+        {
+          path: 'register',
+          name: 'register',
+          component: () => import('@/pages/RegisterPage.vue'),
+          meta: { title: 'Регистрация' },
+        },
+        {
+          path: 'onboarding',
+          name: 'onboarding',
+          component: () => import('@/pages/OnboardingPage.vue'),
+          meta: { title: 'Создание студии' },
         },
         {
           path: ':pathMatch(.*)*',
@@ -128,12 +141,14 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const needsAuth = to.matched.some((r) => r.meta.requiresAuth)
-  if (!needsAuth) return true
+  const isOnboarding = to.path === '/onboarding'
+  if (!needsAuth && !isOnboarding) return true
   // Local-режим без бэкенда: админка открыта как раньше.
   if (!isSupabaseEnabled()) return true
   const auth = useAuthStore()
   if (!auth.initialized) await auth.init()
   if (!auth.user) return { path: '/login', query: { redirect: to.fullPath } }
+  if (isOnboarding && auth.business) return { path: '/admin' }
   return true
 })
 

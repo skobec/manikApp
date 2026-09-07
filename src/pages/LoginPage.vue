@@ -56,7 +56,8 @@ async function submit() {
       </form>
 
       <p class="auth-page__alt">
-        Вход только для владельца студии.
+        Вход только для владельца студии.<br />
+        Первый вход? <router-link to="/register">Создать аккаунт владельца</router-link>
       </p>
     </div>
   </div>
