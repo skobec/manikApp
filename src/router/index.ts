@@ -109,6 +109,12 @@ const router = createRouter({
           component: () => import('@/pages/admin/AdminCalendar.vue'),
           meta: { title: 'Календарь' },
         },
+        {
+          path: 'notifications',
+          name: 'admin-notifications',
+          component: () => import('@/pages/admin/AdminNotifications.vue'),
+          meta: { title: 'Уведомления' },
+        },
       ],
     },
   ],

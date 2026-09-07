@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
+import AppPhoneInput from '@/components/ui/AppPhoneInput.vue'
+import { isValidRuPhone, checkBookingRateLimit, recordBookingAttempt } from '@/utils/phone'
 import ServiceCard from '@/components/ServiceCard.vue'
 import { useServices } from '@/composables/useServices'
 import { useBookings } from '@/composables/useBookings'
@@ -41,6 +43,14 @@ const cloudServices = ref<Service[]>([])
 const cloudBookings = ref<Booking[]>([])
 const cloudLoading = ref(false)
 const submitError = ref('')
+const phoneError = ref('')
+
+// --- Антиспам ---
+// honeypot: человек поле не видит и не заполняет, бот — заполняет.
+// time-trap: живой человек не заполняет форму быстрее ~2.5 сек.
+// Ботов «успешно» провожаем молча, не раскрывая защиту.
+const formStartedAt = ref(Date.now())
+const honeypot = ref('')
 
 async function loadCloud() {
   if (!cloud.value || !props.context) return
@@ -106,7 +116,21 @@ function selectDateTime() {
 
 async function submit() {
   submitError.value = ''
-  if (!name.value || !phone.value || !selectedService.value) return
+  phoneError.value = ''
+  if (!name.value || !selectedService.value) return
+  if (honeypot.value || Date.now() - formStartedAt.value < 2500) {
+    step.value = 'done'
+    return
+  }
+  if (!isValidRuPhone(phone.value)) {
+    phoneError.value = 'Введите номер полностью: +7 (___) ___-__-__'
+    return
+  }
+  if (!checkBookingRateLimit()) {
+    submitError.value = 'Слишком много заявок с этого устройства. Попробуйте позже.'
+    show(submitError.value, 'error')
+    return
+  }
   const svc = selectedService.value
   if (cloud.value && props.context) {
     try {
@@ -137,6 +161,7 @@ async function submit() {
       comment: comment.value,
     })
   }
+  recordBookingAttempt()
   step.value = 'done'
   show('Заявка отправлена! Мы свяжемся с вами в ближайшее время.', 'success')
 }
@@ -252,8 +277,17 @@ const shownCategories = computed(() => (cloud.value ? allCategories.value : loca
         </div>
         <div class="booking-form__fields">
           <AppInput v-model="name" label="Имя" placeholder="Как к вам обращаться?" />
-          <AppInput v-model="phone" label="Телефон" type="tel" placeholder="+7 (999) 123-45-67" />
+          <AppPhoneInput v-model="phone" label="Телефон" :error="phoneError" />
           <AppInput v-model="comment" label="Комментарий" placeholder="Пожелания к записи (необязательно)" multiline />
+          <input
+            v-model="honeypot"
+            type="text"
+            name="website"
+            tabindex="-1"
+            autocomplete="off"
+            aria-hidden="true"
+            class="booking-form__honeypot"
+          />
         </div>
         <p v-if="submitError" class="booking-form__submit-error">{{ submitError }}</p>
         <div class="booking-form__nav">
@@ -462,6 +496,16 @@ const shownCategories = computed(() => (cloud.value ? allCategories.value : loca
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  // Ловушка для ботов: поле вне экрана (display:none не используем —
+  // боты его детектят). Человек его никогда не заполняет.
+  &__honeypot {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
   }
 
   &__submit-error {
