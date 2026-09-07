@@ -15,8 +15,6 @@ const emailError = ref('')
 const passwordError = ref('')
 
 function target(): string {
-  if (auth.business) return '/admin'
-  if (auth.user) return '/onboarding'
   return (route.query.redirect as string) || '/admin'
 }
 
@@ -58,7 +56,7 @@ async function submit() {
       </form>
 
       <p class="auth-page__alt">
-        Нет аккаунта? <router-link to="/register">Зарегистрироваться</router-link>
+        Вход только для владельца студии.
       </p>
     </div>
   </div>

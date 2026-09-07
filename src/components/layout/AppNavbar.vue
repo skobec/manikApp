@@ -2,7 +2,6 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
-import { business } from '@/config/business'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,7 +11,11 @@ const isScrolled = ref(false)
 
 const links = [
   { to: '/', label: 'Главная' },
-  { to: '/masters', label: 'Мастерам' },
+  { to: '/gallery', label: 'Работы' },
+  { to: '/prices', label: 'Цены' },
+  { to: '/reviews', label: 'Отзывы' },
+  { to: '/contacts', label: 'Контакты' },
+  { to: '/booking', label: 'Запись' },
 ]
 
 watch(
@@ -26,7 +29,7 @@ onMounted(() => {
 })
 
 function goBooking() {
-  router.push(`/${business.featuredSlug}/booking`)
+  router.push('/booking')
 }
 </script>
 

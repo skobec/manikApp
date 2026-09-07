@@ -59,11 +59,19 @@ onMounted(async () => {
 })
 
 function goStudio() {
-  router.push(`/${featuredSlug}`)
+  router.push('/prices')
 }
 
 function goBooking() {
-  router.push(`/${featuredSlug}/booking`)
+  router.push('/booking')
+}
+
+function goGallery() {
+  router.push('/gallery')
+}
+
+function goReviews() {
+  router.push('/reviews')
 }
 </script>
 
@@ -105,7 +113,7 @@ function goBooking() {
           <GalleryCard v-for="item in works.slice(0, 4)" :key="item.id" :item="item" />
         </div>
         <div class="home__section-action">
-          <AppButton variant="secondary" @click="goStudio">Вся галерея</AppButton>
+          <AppButton variant="secondary" @click="goGallery">Вся галерея</AppButton>
         </div>
       </div>
     </section>
@@ -121,7 +129,7 @@ function goBooking() {
           <ReviewCard v-for="r in reviews.slice(0, 3)" :key="r.id" :review="r" />
         </div>
         <div class="home__section-action">
-          <AppButton variant="secondary" @click="goStudio">Все отзывы</AppButton>
+          <AppButton variant="secondary" @click="goReviews">Все отзывы</AppButton>
         </div>
       </div>
     </section>

@@ -4,7 +4,6 @@ import { useAuthStore } from '@/stores/authStore'
 import { isSupabaseEnabled } from '@/services/supabase'
 
 const DEFAULT_TITLE = `${business.name} — маникюр на каждый день`
-const featured = business.featuredSlug
 
 const router = createRouter({
   // BASE_URL подхватывает base из vite.config.ts — роутер корректно
@@ -18,7 +17,6 @@ const router = createRouter({
       path: '/',
       component: () => import('@/components/layout/AppLayout.vue'),
       children: [
-        // Главная — витрина флагманской студии (твой салон).
         {
           path: '',
           name: 'home',
@@ -26,50 +24,41 @@ const router = createRouter({
           meta: { title: 'Главная' },
         },
         {
-          path: 'masters',
-          name: 'masters',
-          component: () => import('@/pages/MastersPage.vue'),
-          meta: { title: 'Мастерам' },
+          path: 'gallery',
+          name: 'gallery',
+          component: () => import('@/pages/GalleryPage.vue'),
+          meta: { title: 'Работы' },
         },
+        {
+          path: 'prices',
+          name: 'prices',
+          component: () => import('@/pages/PricesPage.vue'),
+          meta: { title: 'Цены' },
+        },
+        {
+          path: 'reviews',
+          name: 'reviews',
+          component: () => import('@/pages/ReviewsPage.vue'),
+          meta: { title: 'Отзывы' },
+        },
+        {
+          path: 'contacts',
+          name: 'contacts',
+          component: () => import('@/pages/ContactsPage.vue'),
+          meta: { title: 'Контакты' },
+        },
+        {
+          path: 'booking',
+          name: 'booking',
+          component: () => import('@/pages/BookingPage.vue'),
+          meta: { title: 'Запись онлайн' },
+        },
+        // Вход только для владельца (публичной регистрации в v1 нет).
         {
           path: 'login',
           name: 'login',
           component: () => import('@/pages/LoginPage.vue'),
           meta: { title: 'Вход' },
-        },
-        {
-          path: 'register',
-          name: 'register',
-          component: () => import('@/pages/RegisterPage.vue'),
-          meta: { title: 'Регистрация' },
-        },
-        {
-          path: 'onboarding',
-          name: 'onboarding',
-          component: () => import('@/pages/OnboardingPage.vue'),
-          meta: { title: 'Создание студии' },
-        },
-        // Legacy одностраничного сайта → флагман и 404.
-        { path: 'booking', redirect: `/${featured}/booking` },
-        { path: 'gallery', redirect: '/' },
-        { path: 'prices', redirect: '/' },
-        { path: 'reviews', redirect: '/' },
-        { path: 'contacts', redirect: '/' },
-        // Публичная страница студии и её запись. Статичные роуты выше,
-        // поэтому /login, /admin и т.п. сюда не попадают.
-        {
-          path: ':slug',
-          name: 'studio',
-          component: () => import('@/pages/StudioPage.vue'),
-          props: true,
-          meta: { title: 'Студия' },
-        },
-        {
-          path: ':slug/booking',
-          name: 'studio-booking',
-          component: () => import('@/pages/BookingPage.vue'),
-          props: true,
-          meta: { title: 'Запись онлайн' },
         },
         {
           path: ':pathMatch(.*)*',
@@ -127,14 +116,12 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const needsAuth = to.matched.some((r) => r.meta.requiresAuth)
-  const isOnboarding = to.path === '/onboarding'
-  if (!needsAuth && !isOnboarding) return true
+  if (!needsAuth) return true
   // Local-режим без бэкенда: админка открыта как раньше.
   if (!isSupabaseEnabled()) return true
   const auth = useAuthStore()
   if (!auth.initialized) await auth.init()
   if (!auth.user) return { path: '/login', query: { redirect: to.fullPath } }
-  if (isOnboarding && auth.business) return { path: '/admin' }
   return true
 })
 
