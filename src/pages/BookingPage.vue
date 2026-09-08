@@ -19,6 +19,17 @@ const context = computed<BookingContext | null>(() => {
   }
 })
 
+const phone = computed(() => (cloud ? (biz.value?.phone ?? '') : '+7 (999) 123-45-67'))
+const address = computed(() => {
+  if (!cloud) return 'г. Москва, ул. Тверская, д. 15'
+  const parts = [biz.value?.city, biz.value?.address].filter(Boolean)
+  return parts.join(', ')
+})
+
+function telHref(value: string): string {
+  return `tel:${value.replace(/[^+\d]/g, '')}`
+}
+
 onMounted(async () => {
   if (!cloud) return
   loading.value = true
@@ -39,7 +50,23 @@ onMounted(async () => {
       <div v-if="cloud && loading" class="booking-page__loading">
         <AppLoader size="lg" />
       </div>
-      <BookingForm v-else :context="context" />
+      <div v-else class="booking-page__layout">
+        <div class="booking-page__form">
+          <BookingForm :context="context" />
+        </div>
+        <aside class="booking-page__side">
+          <h3>Контакты для записи</h3>
+          <p v-if="phone" class="booking-page__contact">
+            <span class="booking-page__label">Телефон</span>
+            <a :href="telHref(phone)">{{ phone }}</a>
+          </p>
+          <p v-if="address" class="booking-page__contact">
+            <span class="booking-page__label">Адрес</span>
+            {{ address }}
+          </p>
+          <p class="booking-page__note">Не дозвонились? Оставьте заявку в форме — перезвоним и подтвердим время.</p>
+        </aside>
+      </div>
     </div>
   </div>
 </template>
@@ -54,6 +81,58 @@ onMounted(async () => {
 
   &__inner {
     @include container;
+  }
+
+  &__layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 32px;
+    align-items: start;
+
+    @include tablet {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__side {
+    @include card;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: sticky;
+    top: calc($nav-height + 24px);
+
+    h3 { font-size: 18px; }
+
+    @include tablet {
+      position: static;
+    }
+  }
+
+  &__contact {
+    font-size: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    a {
+      color: $color-primary;
+      font-weight: 600;
+      text-decoration: none;
+      &:hover { text-decoration: underline; }
+    }
+  }
+
+  &__label {
+    font-size: 12px;
+    color: $color-text-tertiary;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  &__note {
+    font-size: 13px;
   }
 
   &__loading {

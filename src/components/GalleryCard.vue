@@ -1,15 +1,29 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import type { GalleryItem } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   item: GalleryItem
 }>()
+
+// Реальный URL (Storage, внешний https или локальный dataURL) — показываем фото,
+// иначе (или если файл битый) — заглушку.
+const hasSrc = computed(() => !!props.item.src && /^(https?:|data:)/.test(props.item.src))
+const imgOk = ref(true)
 </script>
 
 <template>
   <div class="gallery-card">
     <div class="gallery-card__image">
-      <div class="gallery-card__placeholder">
+      <img
+        v-if="hasSrc && imgOk"
+        :src="item.src"
+        :alt="item.alt || 'Работа мастера'"
+        class="gallery-card__photo"
+        loading="lazy"
+        @error="imgOk = false"
+      />
+      <div v-else class="gallery-card__placeholder">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
           <circle cx="8.5" cy="8.5" r="1.5"/>
@@ -17,9 +31,9 @@ defineProps<{
         </svg>
       </div>
     </div>
-    <div class="gallery-card__info">
-      <span class="gallery-card__category">{{ item.category }}</span>
-      <p class="gallery-card__desc">{{ item.description }}</p>
+    <div v-if="item.category || item.description" class="gallery-card__info">
+      <span v-if="item.category" class="gallery-card__category">{{ item.category }}</span>
+      <p v-if="item.description" class="gallery-card__desc">{{ item.description }}</p>
     </div>
   </div>
 </template>
@@ -36,6 +50,12 @@ defineProps<{
   &__image {
     aspect-ratio: 3/4;
     overflow: hidden;
+  }
+
+  &__photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   &__placeholder {

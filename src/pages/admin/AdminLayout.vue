@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { business } from '@/config/business'
@@ -14,6 +14,17 @@ async function logout() {
   await auth.signOut()
   router.push('/login')
 }
+
+// Диагностика связки «админка → сайт»: если бэкенд включён, но сессии
+// владельца со студией нет — разделы пишут в локальные демо-данные,
+// а сайт показывает базу. Баннер сразу показывает причину.
+const scopeWarning = computed(() => {
+  if (!auth.backendEnabled || !auth.initialized) return ''
+  if (!auth.user) return 'Вы не вошли. Админка работает с локальными демо-данными — сайт их не увидит. Войдите через /login.'
+  if (!auth.business)
+    return 'К аккаунту не привязана студия. Админка пишет локально, сайт берёт данные из базы. Создайте студию или войдите под владельцем.'
+  return ''
+})
 
 const links = [
   { to: '/admin', label: 'Главная', icon: 'dashboard' },
@@ -93,6 +104,9 @@ function icon(name: string) {
           <template v-else-if="route.path === '/admin/notifications'">Уведомления</template>
           <template v-else-if="route.path === '/admin/profile'">Профиль</template>
         </h2>
+      </div>
+      <div v-if="scopeWarning" class="admin-main__warn">
+        {{ scopeWarning }}
       </div>
       <div class="admin-main__content">
         <router-view />
@@ -274,6 +288,16 @@ function icon(name: string) {
 
   &__title {
     font-size: 18px;
+  }
+
+  &__warn {
+    margin: 16px 32px 0;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #92400e;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: $radius-sm;
   }
 
   &__content {

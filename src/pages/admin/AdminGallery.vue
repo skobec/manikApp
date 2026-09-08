@@ -22,6 +22,11 @@ useAdminScope([useCloudScope])
 const isCloud = computed(() => isSupabaseEnabled() && !!auth.business)
 const uploading = ref(false)
 const uploadError = ref('')
+const brokenImgs = ref<Record<string, boolean>>({})
+
+function hasPhoto(item: GalleryItem): boolean {
+  return !!item.src && /^(https?:|data:)/.test(item.src) && !brokenImgs.value[item.id]
+}
 
 async function onFile(e: Event) {
   const input = e.target as HTMLInputElement
@@ -117,7 +122,15 @@ async function confirmRemove(id: string) {
     <div v-else class="admin-gallery__grid">
       <div v-for="item in items" :key="item.id" class="admin-gallery__card">
         <div class="admin-gallery__card-preview">
-          <div class="admin-gallery__card-placeholder">
+          <img
+            v-if="hasPhoto(item)"
+            :src="item.src"
+            :alt="item.alt || 'Работа'"
+            class="admin-gallery__card-photo"
+            loading="lazy"
+            @error="brokenImgs[item.id] = true"
+          />
+          <div v-else class="admin-gallery__card-placeholder">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           </div>
         </div>
@@ -200,6 +213,13 @@ async function confirmRemove(id: string) {
     align-items: center;
     justify-content: center;
     color: $color-text-tertiary;
+    overflow: hidden;
+  }
+
+  &__card-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   &__card-info {
