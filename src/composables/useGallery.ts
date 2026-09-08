@@ -4,7 +4,7 @@ import { storage } from '@/services/storage'
 import { defaultGallery } from '@/data/gallery'
 import { generateId } from '@/utils/helpers'
 import { isSupabaseEnabled } from '@/services/supabase'
-import { listWorks, createWork, deleteWork } from '@/services/repositories/media'
+import { listWorks, createWork, updateWork, deleteWork } from '@/services/repositories/media'
 import { ruError } from '@/utils/errors'
 
 const items = ref<GalleryItem[]>([])
@@ -50,7 +50,12 @@ export function useGallery() {
     if (isCloud()) {
       cloudError.value = ''
       try {
-        const created = await createWork(cloudBusinessId.value as string, item.src)
+        const created = await createWork(cloudBusinessId.value as string, {
+          url: item.src,
+          alt: item.alt,
+          description: item.description,
+          category: item.category,
+        })
         items.value.push(created)
         return created
       } catch (e) {
@@ -65,12 +70,27 @@ export function useGallery() {
   }
 
   async function update(id: string, updates: Partial<GalleryItem>) {
-    // В cloud-режиме media — только url (остальное маппится), поэтому
-    // обновление полей карточки не поддерживается и применяется локально к ref.
+    if (isCloud()) {
+      cloudError.value = ''
+      try {
+        const updated = await updateWork(id, {
+          url: updates.src,
+          alt: updates.alt,
+          description: updates.description,
+          category: updates.category,
+        })
+        const index = items.value.findIndex((i) => i.id === id)
+        if (index !== -1) items.value[index] = { ...updated, date: items.value[index].date }
+        return
+      } catch (e) {
+        cloudError.value = ruError(e instanceof Error ? e.message : '')
+        throw e
+      }
+    }
     const index = items.value.findIndex((i) => i.id === id)
     if (index !== -1) {
       items.value[index] = { ...items.value[index], ...updates }
-      if (!isCloud()) save()
+      save()
     }
   }
 
