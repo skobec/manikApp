@@ -52,7 +52,8 @@ Free-проект засыпает после ~недели **низкой ак�
 3 раза в сутки дёргает 2 лёгких чтения. Включи так:
 
 - [ ] Репозиторий → Settings → Secrets and variables → Actions → **Variables**:
-  `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` (публичные значения, не секреты).
+  `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` (публичные значения,
+  не секреты; те же переменные использует деплой).
 - [ ] Actions → выбрать `Supabase keep-alive` → Run workflow (проверочный прогон).
 
 Что уже внутри миграции:

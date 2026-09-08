@@ -186,12 +186,31 @@ src/
 | **Cloudflare Pages** (рекомендую) | $0 | из коробки (`public/_redirects`) | Быстрый CDN, без карты, custom-домен бесплатно |
 | **Vercel** | $0 (Hobby) | из коробки (`vercel.json`) | `git push` → деплой; нужен импорт репозитория |
 | **Netlify** | $0 | из коробки (`public/_redirects`) | Аналог Vercel |
-| **GitHub Pages** | $0 | через трюк `404.html` | Workflow уже в `.github/workflows/deploy-pages.yml`: сборка → копия `index.html` в `404.html` → публикация. Включить: Settings → Pages → Source: GitHub Actions. URL будет `https://<user>.github.io/<repo>/` |
+| **GitHub Pages** | $0 | через трюк `404.html` | CI: проверка типов+сборка на каждый push/PR; CD: деплой при пуше в `master`. Включить: Settings → Pages → Source: GitHub Actions. URL: `https://<user>.github.io/<repo>/`. **Обязательно** задать Variables (иначе деплой будет в демо-режиме без базы!) — см. ниже |
 
 Без fallback `/booking`, `/admin` дадут 404 при прямом открытии/обновлении —
 это особенность `createWebHistory()`, а не баг.
 
 `public/robots.txt` разрешает индексацию публичных страниц и закрывает `/admin/`.
+
+### Деплой на GitHub Pages — по шагам
+
+Vite впечатывает `VITE_*` в сборку **в момент билда**, поэтому `.env.local`
+(он в gitignore) до CI не долетает. Без переменных сайт соберётся, но будет
+в демо-режиме на localStorage — записи не дойдут до базы.
+
+1. Репозиторий → Settings → Secrets and variables → Actions → **Variables** →
+   создать все 7 (значения — как в твоём `.env.local`):
+   `VITE_USE_SUPABASE=true`, `VITE_SUPABASE_URL`,
+   `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_APP_NAME`,
+   `VITE_BUSINESS_SLUG`, `VITE_FEATURED_SLUG`, `VITE_BUSINESS_TIMEZONE`.
+   Те же переменные использует keep-alive workflow — дублировать не надо.
+2. Settings → Pages → Source: **GitHub Actions**.
+3. `git push origin master` → Actions собирает, проверяет типы и деплоит.
+   PR в `master` только проверяют сборку, без публикации.
+4. Для писем восстановления пароля: Supabase → Authentication →
+   URL Configuration → Redirect URLs → добавить
+   `https://<user>.github.io/<repo>/**`.
 
 ### RU-зона: что важно знать
 
