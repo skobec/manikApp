@@ -10,6 +10,7 @@ import { ruError } from '@/utils/errors'
 const services = ref<Service[]>([])
 const cloudBusinessId = ref<string | null>(null)
 const cloudError = ref('')
+const loading = ref(false)
 
 function load() {
   const saved = storage.getAll<Service>('services')
@@ -35,7 +36,14 @@ export function useServices() {
 
   async function useCloudScope(businessId: string) {
     cloudBusinessId.value = businessId
-    await reload()
+    // Сбрасываем мок, чтобы он не мелькал, пока грузится база.
+    services.value = []
+    loading.value = true
+    try {
+      await reload()
+    } finally {
+      loading.value = false
+    }
   }
 
   function useLocalScope() {
@@ -131,6 +139,7 @@ export function useServices() {
     services,
     activeServices,
     categories,
+    loading,
     cloudError,
     getById,
     add,

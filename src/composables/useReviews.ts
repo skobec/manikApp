@@ -10,6 +10,7 @@ import { ruError } from '@/utils/errors'
 const reviews = ref<Review[]>([])
 const cloudBusinessId = ref<string | null>(null)
 const cloudError = ref('')
+const loading = ref(false)
 
 function load() {
   const saved = storage.getAll<Review>('reviews')
@@ -30,7 +31,13 @@ export function useReviews() {
 
   async function useCloudScope(businessId: string) {
     cloudBusinessId.value = businessId
-    await reload()
+    reviews.value = []
+    loading.value = true
+    try {
+      await reload()
+    } finally {
+      loading.value = false
+    }
   }
 
   function useLocalScope() {
@@ -114,5 +121,5 @@ export function useReviews() {
     storage.set('reviews', reviews.value)
   }
 
-  return { reviews, activeReviews, cloudError, add, update, remove, load, useCloudScope, useLocalScope, reload }
+  return { reviews, activeReviews, loading, cloudError, add, update, remove, load, useCloudScope, useLocalScope, reload }
 }

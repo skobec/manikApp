@@ -1,33 +1,21 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
-import { business as featuredConfig } from '@/config/business'
-import { isSupabaseEnabled } from '@/services/supabase'
-import type { Business } from '@/types'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import { useFeatured } from '@/composables/useFeatured'
 
 const router = useRouter()
-const cloud = isSupabaseEnabled()
+const { cloud, loading, biz, ensureLoaded } = useFeatured()
 
-const biz = ref<Business | null>(null)
-
-const phone = computed(() => (cloud ? (biz.value?.phone ?? '') : '+7 (999) 123-45-67'))
-const email = computed(() => (cloud ? (biz.value?.email ?? '') : 'hello@didinails.ru'))
+const phone = computed(() => biz.value?.phone || '+7 (999) 123-45-67')
+const email = computed(() => biz.value?.email || 'hello@didinails.ru')
 const address = computed(() => {
-  if (!cloud) return 'г. Москва, ул. Тверская, д. 15'
   const parts = [biz.value?.city, biz.value?.address].filter(Boolean)
-  return parts.join(', ')
+  return parts.join(', ') || 'г. Москва, ул. Тверская, д. 15'
 })
 
-onMounted(async () => {
-  if (!cloud) return
-  try {
-    const { getBusinessBySlug } = await import('@/services/repositories/businesses')
-    biz.value = await getBusinessBySlug(featuredConfig.featuredSlug)
-  } catch {
-    // Показываем демо-контакты.
-  }
-})
+onMounted(ensureLoaded)
 
 function telHref(value: string): string {
   return `tel:${value.replace(/[^+\d]/g, '')}`
@@ -43,7 +31,12 @@ function telHref(value: string): string {
         <p>Всегда на связи и готовы ответить на ваши вопросы</p>
       </div>
       <div class="contacts-page__grid">
-        <div class="contacts-page__info">
+        <div v-if="cloud && loading" class="contacts-page__info">
+          <AppSkeleton height="64px" radius="12px" />
+          <AppSkeleton height="64px" radius="12px" />
+          <AppSkeleton height="64px" radius="12px" />
+        </div>
+        <div v-else class="contacts-page__info">
           <div v-if="address" class="contacts-page__item">
             <div class="contacts-page__icon">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">

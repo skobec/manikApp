@@ -1,37 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import ReviewCard from '@/components/ReviewCard.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import { business } from '@/config/business'
-import { isSupabaseEnabled } from '@/services/supabase'
-import { listReviews } from '@/services/repositories/reviews'
-import { useReviews } from '@/composables/useReviews'
-import type { Review } from '@/types'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import { useFeatured } from '@/composables/useFeatured'
 
 const router = useRouter()
-const cloud = isSupabaseEnabled()
-const localReviews = useReviews()
+const { cloud, loading, reviews, ensureLoaded } = useFeatured()
 
-const cloudReady = ref(false)
-const cloudReviews = ref<Review[]>([])
-
-const reviews = computed(() =>
-  cloudReady.value ? cloudReviews.value.filter((r) => r.active) : localReviews.activeReviews.value,
-)
-
-onMounted(async () => {
-  if (!cloud) return
-  try {
-    const { getBusinessBySlug } = await import('@/services/repositories/businesses')
-    const found = await getBusinessBySlug(business.featuredSlug)
-    if (!found) return
-    cloudReviews.value = await listReviews(found.id)
-    cloudReady.value = true
-  } catch {
-    // Показываем демо-данные.
-  }
-})
+onMounted(ensureLoaded)
 </script>
 
 <template>
@@ -41,7 +19,10 @@ onMounted(async () => {
         <span class="reviews-page__badge">Отзывы</span>
         <h1>Что говорят клиенты</h1>
       </div>
-      <div v-if="reviews.length === 0" class="reviews-page__empty">
+      <div v-if="cloud && loading" class="reviews-page__grid">
+        <AppSkeleton v-for="i in 4" :key="i" height="160px" radius="16px" />
+      </div>
+      <div v-else-if="reviews.length === 0" class="reviews-page__empty">
         <p>Отзывов пока нет — станьте первым!</p>
       </div>
       <div v-else class="reviews-page__grid">

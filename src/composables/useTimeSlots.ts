@@ -24,6 +24,7 @@ const cloudBusinessId = ref<string | null>(null)
 const hours = ref<WorkingHoursRow[]>([])
 const periods = ref<BlockedPeriodRow[]>([])
 const cloudError = ref('')
+const loading = ref(false)
 
 function load() {
   const saved = storage.getAll<TimeSlot>('timeSlots')
@@ -44,7 +45,14 @@ function isCloud(): boolean {
 export function useTimeSlots() {
   async function useCloudScope(businessId: string) {
     cloudBusinessId.value = businessId
-    await reload()
+    hours.value = []
+    periods.value = []
+    loading.value = true
+    try {
+      await reload()
+    } finally {
+      loading.value = false
+    }
   }
 
   function useLocalScope() {
@@ -127,6 +135,7 @@ export function useTimeSlots() {
   return {
     slots,
     blockedTimes,
+    loading,
     cloudError,
     getSlotsForDate,
     toggleBlocked,

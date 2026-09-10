@@ -6,11 +6,12 @@ import AppButton from '@/components/ui/AppButton.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import { useToast } from '@/composables/useToast'
 import { formatPrice } from '@/utils/helpers'
 import type { Service } from '@/types'
 
-const { services, cloudError, add, update, remove, useCloudScope } = useServices()
+const { services, loading, cloudError, add, update, remove, useCloudScope } = useServices()
 const { show } = useToast()
 
 useAdminScope([useCloudScope])
@@ -92,7 +93,10 @@ async function toggleService(s: Service) {
       <AppButton @click="openAdd">Добавить услугу</AppButton>
     </div>
 
-    <div v-if="services.length === 0" class="admin-services__empty">
+    <div v-if="loading" class="admin-services__list">
+      <AppSkeleton v-for="i in 3" :key="i" height="88px" radius="8px" />
+    </div>
+    <div v-else-if="services.length === 0" class="admin-services__empty">
       <p>Нет услуг. Добавьте первую.</p>
     </div>
 

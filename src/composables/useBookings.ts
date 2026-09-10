@@ -14,6 +14,7 @@ import { ruError } from '@/utils/errors'
 const bookings = ref<Booking[]>([])
 const cloudBusinessId = ref<string | null>(null)
 const cloudError = ref('')
+const loading = ref(false)
 
 function load() {
   bookings.value = storage.getAll<Booking>('bookings')
@@ -28,7 +29,13 @@ function isCloud(): boolean {
 export function useBookings() {
   async function useCloudScope(businessId: string) {
     cloudBusinessId.value = businessId
-    await reload()
+    bookings.value = []
+    loading.value = true
+    try {
+      await reload()
+    } finally {
+      loading.value = false
+    }
   }
 
   function useLocalScope() {
@@ -102,6 +109,7 @@ export function useBookings() {
 
   return {
     bookings,
+    loading,
     cloudError,
     create,
     updateStatus,

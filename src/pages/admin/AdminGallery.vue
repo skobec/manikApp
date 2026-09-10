@@ -10,10 +10,11 @@ import AppButton from '@/components/ui/AppButton.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import { useToast } from '@/composables/useToast'
 import type { GalleryItem } from '@/types'
 
-const { items, cloudError, add, update, remove, useCloudScope } = useGallery()
+const { items, loading, cloudError, add, update, remove, useCloudScope } = useGallery()
 const { show } = useToast()
 const auth = useAuthStore()
 
@@ -115,7 +116,10 @@ async function confirmRemove(id: string) {
       <AppButton @click="openAdd">Добавить работу</AppButton>
     </div>
 
-    <div v-if="items.length === 0" class="admin-gallery__empty">
+    <div v-if="loading" class="admin-gallery__grid">
+      <AppSkeleton v-for="i in 4" :key="i" height="200px" radius="8px" />
+    </div>
+    <div v-else-if="items.length === 0" class="admin-gallery__empty">
       <p>Нет работ в портфолио</p>
     </div>
 

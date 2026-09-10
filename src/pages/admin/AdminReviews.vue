@@ -5,11 +5,12 @@ import { useAdminScope } from '@/composables/useAdminScope'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import { useToast } from '@/composables/useToast'
 import { formatDate } from '@/utils/helpers'
 import type { Review } from '@/types'
 
-const { reviews, cloudError, add, update, remove, useCloudScope } = useReviews()
+const { reviews, loading, cloudError, add, update, remove, useCloudScope } = useReviews()
 const { show } = useToast()
 
 useAdminScope([useCloudScope])
@@ -85,7 +86,10 @@ function renderStars(rating: number) {
       <AppButton @click="openAdd">Добавить отзыв</AppButton>
     </div>
 
-    <div v-if="reviews.length === 0" class="admin-reviews__empty">
+    <div v-if="loading" class="admin-reviews__list">
+      <AppSkeleton v-for="i in 3" :key="i" height="96px" radius="8px" />
+    </div>
+    <div v-else-if="reviews.length === 0" class="admin-reviews__empty">
       <p>Нет отзывов</p>
     </div>
 

@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppPhoneInput from '@/components/ui/AppPhoneInput.vue'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import { isValidRuPhone, checkBookingRateLimit, recordBookingAttempt } from '@/utils/phone'
 import ServiceCard from '@/components/ServiceCard.vue'
 import { useServices } from '@/composables/useServices'
@@ -50,6 +51,7 @@ const phoneError = ref('')
 // часы даты через RPC (гостю таблицы напрямую недоступны — приватность).
 const hoursCache = ref<WorkingHoursRow[] | null>(null)
 const dayTimes = ref<DayTimes | null>(null)
+const dayLoading = ref(false)
 
 // --- Антиспам ---
 // honeypot: человек поле не видит и не заполняет, бот — заполняет.
@@ -79,10 +81,13 @@ async function loadDayTimes(date: string) {
   dayTimes.value = null
   selectedTime.value = ''
   if (!cloud.value || !props.context || !date) return
+  dayLoading.value = true
   try {
     dayTimes.value = await getDayTimes(props.context.businessId, date, props.context.timezone)
   } catch (e) {
     show(ruError(e instanceof Error ? e.message : ''), 'error')
+  } finally {
+    dayLoading.value = false
   }
 }
 
@@ -230,7 +235,9 @@ const shownCategories = computed(() => (cloud.value ? allCategories.value : loca
           <h2>Выберите услугу</h2>
           <p>Нажмите на нужную услугу, чтобы продолжить</p>
         </div>
-        <div v-if="cloudLoading" class="booking-form__loading">Загружаем услуги…</div>
+        <div v-if="cloudLoading" class="booking-form__services">
+          <AppSkeleton v-for="i in 3" :key="i" height="110px" radius="16px" />
+        </div>
         <template v-else>
           <div class="booking-form__categories">
             <button
@@ -283,15 +290,20 @@ const shownCategories = computed(() => (cloud.value ? allCategories.value : loca
         <div v-if="selectedDate" class="booking-form__times">
           <p class="booking-form__times-label">Доступное время</p>
           <div class="booking-form__times-grid">
-            <button
-              v-for="slot in availableSlots"
-              :key="slot.time"
-              :class="['booking-form__time-btn', { 'booking-form__time-btn--active': selectedTime === slot.time }]"
-              :disabled="!slot.available"
-              @click="selectedTime = slot.time"
-            >
-              {{ slot.time }}
-            </button>
+            <template v-if="dayLoading">
+              <AppSkeleton v-for="i in 8" :key="i" height="42px" radius="8px" />
+            </template>
+            <template v-else>
+              <button
+                v-for="slot in availableSlots"
+                :key="slot.time"
+                :class="['booking-form__time-btn', { 'booking-form__time-btn--active': selectedTime === slot.time }]"
+                :disabled="!slot.available"
+                @click="selectedTime = slot.time"
+              >
+                {{ slot.time }}
+              </button>
+            </template>
           </div>
         </div>
         <div class="booking-form__nav">

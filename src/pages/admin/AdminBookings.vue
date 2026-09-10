@@ -12,12 +12,13 @@ import AppModal from '@/components/ui/AppModal.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import AppPhoneInput from '@/components/ui/AppPhoneInput.vue'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
 import { useToast } from '@/composables/useToast'
 import { formatDate, getToday } from '@/utils/helpers'
 import { isValidRuPhone } from '@/utils/phone'
 import { ruError } from '@/utils/errors'
 
-const { bookings, cloudError, create, updateStatus, remove: removeBooking, useCloudScope, reload } = useBookings()
+const { bookings, loading, cloudError, create, updateStatus, remove: removeBooking, useCloudScope, reload } = useBookings()
 const { services, useCloudScope: servicesScope } = useServices()
 const { getSlotsForDate, useCloudScope: slotsScope } = useTimeSlots()
 const auth = useAuthStore()
@@ -193,7 +194,10 @@ function statusClass(status: string) {
       <button :class="['admin-bookings__filter', { 'admin-bookings__filter--active': filter === 'cancelled' }]" @click="filter = 'cancelled'">Отменённые</button>
     </div>
 
-    <div v-if="filtered.length === 0" class="admin-bookings__empty">
+    <div v-if="loading" class="admin-bookings__list">
+      <AppSkeleton v-for="i in 3" :key="i" height="96px" radius="8px" />
+    </div>
+    <div v-else-if="filtered.length === 0" class="admin-bookings__empty">
       <p>Нет записей</p>
     </div>
 

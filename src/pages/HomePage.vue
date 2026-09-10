@@ -1,62 +1,18 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import HeroSection from '@/components/HeroSection.vue'
 import ServiceCard from '@/components/ServiceCard.vue'
 import GalleryCard from '@/components/GalleryCard.vue'
 import ReviewCard from '@/components/ReviewCard.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import { business } from '@/config/business'
-import { isSupabaseEnabled } from '@/services/supabase'
-import { getBusinessBySlug } from '@/services/repositories/businesses'
-import { listServices } from '@/services/repositories/services'
-import { listReviews } from '@/services/repositories/reviews'
-import { listWorks } from '@/services/repositories/media'
-import { useServices } from '@/composables/useServices'
-import { useGallery } from '@/composables/useGallery'
-import { useReviews } from '@/composables/useReviews'
-import type { Service, Review, GalleryItem } from '@/types'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import { useFeatured } from '@/composables/useFeatured'
 
 const router = useRouter()
-const cloud = isSupabaseEnabled()
-const featuredSlug = business.featuredSlug
+const { cloud, loading, services, works, reviews, ensureLoaded } = useFeatured()
 
-// Local-режим: демо-данные. Cloud: витрина флагманской студии.
-const localServices = useServices()
-const localGallery = useGallery()
-const localReviews = useReviews()
-
-const cloudReady = ref(false)
-const cloudServices = ref<Service[]>([])
-const cloudWorks = ref<GalleryItem[]>([])
-const cloudReviews = ref<Review[]>([])
-
-const services = computed(() =>
-  cloudReady.value ? cloudServices.value.filter((s) => s.active) : localServices.activeServices.value,
-)
-const works = computed(() => (cloudReady.value ? cloudWorks.value : localGallery.items.value))
-const reviews = computed(() =>
-  cloudReady.value ? cloudReviews.value.filter((r) => r.active) : localReviews.activeReviews.value,
-)
-
-onMounted(async () => {
-  if (!cloud) return
-  try {
-    const found = await getBusinessBySlug(featuredSlug)
-    if (!found) return
-    const [s, w, r] = await Promise.all([
-      listServices(found.id),
-      listWorks(found.id),
-      listReviews(found.id),
-    ])
-    cloudServices.value = s
-    cloudWorks.value = w
-    cloudReviews.value = r
-    cloudReady.value = true
-  } catch {
-    // Флагман не найден или сеть недоступна — показываем демо-данные.
-  }
-})
+onMounted(ensureLoaded)
 
 function goStudio() {
   router.push('/prices')
@@ -79,6 +35,14 @@ function goReviews() {
   <div class="home">
     <HeroSection />
 
+    <section v-if="cloud && loading" class="home__section">
+      <div class="home__container">
+        <div class="home__services-grid">
+          <AppSkeleton v-for="i in 4" :key="i" height="120px" radius="16px" />
+        </div>
+      </div>
+    </section>
+    <template v-else>
     <!-- Services Preview -->
     <section v-if="services.length > 0" class="home__section">
       <div class="home__container">
@@ -133,6 +97,7 @@ function goReviews() {
         </div>
       </div>
     </section>
+    </template>
 
     <!-- CTA -->
     <section class="home__section home__section--cta">

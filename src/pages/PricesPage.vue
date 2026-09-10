@@ -1,24 +1,13 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import PriceCard from '@/components/PriceCard.vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import { business } from '@/config/business'
-import { isSupabaseEnabled } from '@/services/supabase'
-import { listServices } from '@/services/repositories/services'
-import { useServices } from '@/composables/useServices'
-import type { Service } from '@/types'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import { useFeatured } from '@/composables/useFeatured'
 
 const router = useRouter()
-const cloud = isSupabaseEnabled()
-const localServices = useServices()
-
-const cloudReady = ref(false)
-const cloudServices = ref<Service[]>([])
-
-const services = computed(() =>
-  cloudReady.value ? cloudServices.value.filter((s) => s.active) : localServices.activeServices.value,
-)
+const { cloud, loading, services, ensureLoaded } = useFeatured()
 
 const grouped = computed(() => {
   const cats = Array.from(new Set(services.value.map((s) => s.category)))
@@ -28,18 +17,7 @@ const grouped = computed(() => {
   }))
 })
 
-onMounted(async () => {
-  if (!cloud) return
-  try {
-    const { getBusinessBySlug } = await import('@/services/repositories/businesses')
-    const found = await getBusinessBySlug(business.featuredSlug)
-    if (!found) return
-    cloudServices.value = await listServices(found.id)
-    cloudReady.value = true
-  } catch {
-    // Показываем демо-данные.
-  }
-})
+onMounted(ensureLoaded)
 </script>
 
 <template>
@@ -50,7 +28,10 @@ onMounted(async () => {
         <h1>Цены на услуги</h1>
         <p>Прозрачные цены без скрытых доплат</p>
       </div>
-      <div v-if="grouped.length === 0" class="prices-page__empty">
+      <div v-if="cloud && loading" class="prices-page__sections">
+        <AppSkeleton v-for="i in 4" :key="i" height="76px" radius="16px" />
+      </div>
+      <div v-else-if="grouped.length === 0" class="prices-page__empty">
         <p>Услуги скоро появятся. Загляните позже.</p>
       </div>
       <div v-else class="prices-page__sections">

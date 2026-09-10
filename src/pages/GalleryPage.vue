@@ -1,20 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import GalleryCard from '@/components/GalleryCard.vue'
-import { business } from '@/config/business'
-import { isSupabaseEnabled } from '@/services/supabase'
-import { listWorks } from '@/services/repositories/media'
-import { useGallery } from '@/composables/useGallery'
-import type { GalleryItem } from '@/types'
+import AppSkeleton from '@/components/ui/AppSkeleton.vue'
+import { useFeatured } from '@/composables/useFeatured'
 
-const cloud = isSupabaseEnabled()
-const localGallery = useGallery()
-
-const cloudReady = ref(false)
-const cloudWorks = ref<GalleryItem[]>([])
+const { cloud, loading, works, ensureLoaded } = useFeatured()
 const activeCategory = ref('Все')
-
-const works = computed(() => (cloudReady.value ? cloudWorks.value : localGallery.items.value))
 
 const categories = computed(() => {
   const cats = new Set(works.value.map((i) => i.category))
@@ -26,18 +17,7 @@ const filtered = computed(() => {
   return works.value.filter((i) => i.category === activeCategory.value)
 })
 
-onMounted(async () => {
-  if (!cloud) return
-  try {
-    const { getBusinessBySlug } = await import('@/services/repositories/businesses')
-    const found = await getBusinessBySlug(business.featuredSlug)
-    if (!found) return
-    cloudWorks.value = await listWorks(found.id)
-    cloudReady.value = true
-  } catch {
-    // Показываем демо-данные.
-  }
-})
+onMounted(ensureLoaded)
 </script>
 
 <template>
@@ -48,6 +28,10 @@ onMounted(async () => {
         <h1>Наши работы</h1>
         <p>Примеры дизайнов, покрытий и форм</p>
       </div>
+      <div v-if="cloud && loading" class="gallery-page__grid">
+        <AppSkeleton v-for="i in 6" :key="i" height="220px" radius="16px" />
+      </div>
+      <template v-else>
       <div class="gallery-page__categories">
         <button
           v-for="cat in categories"
@@ -64,6 +48,7 @@ onMounted(async () => {
       <div v-else class="gallery-page__grid">
         <GalleryCard v-for="item in filtered" :key="item.id" :item="item" />
       </div>
+      </template>
     </div>
   </div>
 </template>

@@ -10,6 +10,7 @@ import { ruError } from '@/utils/errors'
 const items = ref<GalleryItem[]>([])
 const cloudBusinessId = ref<string | null>(null)
 const cloudError = ref('')
+const loading = ref(false)
 
 function load() {
   const saved = storage.getAll<GalleryItem>('gallery')
@@ -28,7 +29,13 @@ function isCloud(): boolean {
 export function useGallery() {
   async function useCloudScope(businessId: string) {
     cloudBusinessId.value = businessId
-    await reload()
+    items.value = []
+    loading.value = true
+    try {
+      await reload()
+    } finally {
+      loading.value = false
+    }
   }
 
   function useLocalScope() {
@@ -112,5 +119,5 @@ export function useGallery() {
     storage.set('gallery', items.value)
   }
 
-  return { items, cloudError, add, update, remove, load, useCloudScope, useLocalScope, reload }
+  return { items, loading, cloudError, add, update, remove, load, useCloudScope, useLocalScope, reload }
 }
