@@ -9,8 +9,8 @@
 name: Site CI/CD
 
 on:
+  # Сборка проверяется сразу после пуша в ЛЮБУЮ ветку.
   push:
-    branches: [master]
   pull_request:
     branches: [master]
   workflow_dispatch:
@@ -56,7 +56,8 @@ jobs:
           path: dist
 
   deploy:
-    if: github.event_name != 'pull_request'
+    # Публикация — только с master (и не из PR).
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
     needs: build
     runs-on: ubuntu-latest
     environment:
