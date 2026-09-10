@@ -65,3 +65,36 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  # Дымовой тест живого сайта: ловит класс проблем "задеплоилось не то"
+  # (пустые vars, битый base, мёртвый фолбэк) — именно с этим мы боролись.
+  smoke:
+    if: github.event_name != 'pull_request'
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          ORIGIN="https://${{ github.repository_owner }}.github.io"
+          BASE="$ORIGIN/${{ github.event.repository.name }}"
+          # Ждём, пока CDN отдаст свежий деплой (до ~2 минут).
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /tmp/index.html -w "%{http_code}" "$BASE/")
+            [ "$code" = "200" ] && break
+            sleep 20
+          done
+          test "$code" = "200"
+          # Глубокие ссылки: Pages отдаёт SPA-фолбэк со статусом 404 —
+          # проверяем тело (оболочку приложения), а не статус.
+          for p in booking login admin; do
+            body=$(curl -s "$BASE/$p")
+            echo "$body" | grep -q 'id="app"' || (echo "no app shell at /$p" && exit 1)
+          done
+          # Переменные запечены? Если в сборке нет URL Supabase — билд
+          # ехал с пустыми vars, роняем пайплайн сразу, а не ждём жалоб.
+          ASSET=$(grep -o '/[^"]*assets/index-[^"]*\.js' /tmp/index.html | head -1)
+          curl -s "$ORIGIN$ASSET" -o /tmp/app.js
+          if [ -n "${{ vars.VITE_SUPABASE_URL }}" ]; then
+            HOST=$(echo "${{ vars.VITE_SUPABASE_URL }}" | sed 's|https://||')
+            grep -q "$HOST" /tmp/app.js || (echo "Supabase URL not baked into bundle!" && exit 1)
+          fi
+          echo "SMOKE OK"

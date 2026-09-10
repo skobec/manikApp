@@ -1,0 +1,40 @@
+# Ежедневная проверка прода: сайт отвечает + цепочка БД жива
+# (anon-чтение бизнеса и RPC занятости). Падение = письмо владельцу
+# от GitHub (уведомления о failed scheduled workflows включены по умолчанию).
+# Это бесплатный мониторинг без внешних сервисов.
+name: Prod healthcheck
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          ORIGIN="https://${{ github.repository_owner }}.github.io"
+          BASE="$ORIGIN/${{ github.event.repository.name }}"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/")
+          test "$code" = "200" || (echo "site down: $code" && exit 1)
+          API="${{ vars.VITE_SUPABASE_URL }}"
+          KEY="${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}"
+          if [ -z "$API" ]; then echo "no backend vars, site-only check"; exit 0; fi
+          # Бизнес читается гостем?
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            "$API/rest/v1/businesses?select=id&limit=1")
+          test "$code" = "200" || (echo "db read failed: $code" && exit 1)
+          # RPC занятости отвечает? (дата — завтра, без привязки к данным)
+          TOMORROW=$(date -u -d "+1 day" +%F)
+          BID=$(curl -s -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            "$API/rest/v1/businesses?select=id&limit=1" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+          if [ -z "$BID" ]; then echo "db ok, no business yet"; exit 0; fi
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            -H "Content-Type: application/json" \
+            -X POST -d "{\"p_business_id\":\"$BID\",\"p_date\":\"$TOMORROW\",\"p_timezone\":\"Europe/Moscow\"}" \
+            "$API/rest/v1/rpc/get_day_times")
+          test "$code" = "200" || (echo "rpc failed: $code" && exit 1)
+          echo "HEALTHCHECK OK"

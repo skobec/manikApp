@@ -215,6 +215,27 @@ Vite впечатывает `VITE_*` в сборку **в момент билд�
    URL Configuration → Redirect URLs → добавить
    `https://<user>.github.io/<repo>/**`.
 
+### Что ещё умеет CI/CD (уже настроено)
+
+```
+push/PR → build (типы+сборка) → deploy (только master) → smoke → прод
+                                                      ↳ ежедневно healthcheck
+```
+
+- **Smoke-тест после каждого деплоя**: открывает главную + `/booking`, `/login`,
+  `/admin` на проде и проверяет, что Supabase-URL запечён в бандл. Именно он
+  поймал бы историю с пустыми Variables автоматически.
+- **Ежедневный healthcheck** (`.github/workflows/healthcheck.yml`): сайт отвечает,
+  база читается, RPC занятости работает. Падение = письмо от GitHub.
+- **Dependabot** (`.github/dependabot.yml`): еженедельные PR с обновлениями
+  зависимостей — вливать после зелёного CI.
+- Рекомендую включить защиту ветки (Settings → Branches → Add rule → `master` →
+  Require status checks → `build`): сломанный код не уедет в прод.
+
+Сознательно НЕ делаем (AGENTS.md §51, рано для v1): staging-окружения,
+Docker, E2E-тесты, preview-деплой на каждый PR (на Pages их нет —
+это фишка Cloudflare/Vercel, переедем туда при необходимости).
+
 ### RU-зона: что важно знать
 
 - Все четыре варианта выше бесплатны, карты не требуют и открываются из РФ.
