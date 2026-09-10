@@ -38,8 +38,11 @@ jobs:
       # падает на расхождении. npm install самодолечивает lock при дрейфе.
       - run: npm install -g npm@11
       - run: npm install --no-audit --no-fund
-      - run: npm run build
+      # Сборка под подпуть Pages (/user/repo/): base берётся из имени
+      # репозитория автоматически — переименование репо ничего не ломает.
+      - run: npm run build:pages
         env:
+          PAGES_BASE: /${{ github.event.repository.name }}/
           VITE_USE_SUPABASE: ${{ vars.VITE_USE_SUPABASE }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
