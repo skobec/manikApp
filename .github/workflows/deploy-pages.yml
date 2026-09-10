@@ -65,7 +65,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   # Дымовой тест живого сайта: ловит класс проблем "задеплоилось не то"
   # (пустые vars, битый base, мёртвый фолбэк) — именно с этим мы боролись.
