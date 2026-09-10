@@ -33,7 +33,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # Выравниваем npm с локальной разработкой (11.x): разные мажоры
+      # по-разному резолвят транзитивные зависимости, и строгий npm ci
+      # падает на расхождении. npm install самодолечивает lock при дрейфе.
+      - run: npm install -g npm@11
+      - run: npm install --no-audit --no-fund
       - run: npm run build
         env:
           VITE_USE_SUPABASE: ${{ vars.VITE_USE_SUPABASE }}
