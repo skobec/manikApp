@@ -36,3 +36,11 @@ export const supabase: SupabaseClient | null = client
 export function isSupabaseEnabled(): boolean {
   return client !== null
 }
+
+// Подсказка под контекст: локально ключи лежат в .env.local,
+// а на проде они берутся из Variables деплоя (см. README).
+export function backendHint(): string {
+  return import.meta.env.PROD
+    ? 'Бэкенд не подключён: на проде не заданы переменные деплоя (VITE_SUPABASE_*). Проверьте Variables репозитория и перезапустите сборку.'
+    : 'Бэкенд не подключён: задайте Supabase-ключи в .env.local (см. docs/supabase-setup.md).'
+}

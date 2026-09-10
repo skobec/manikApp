@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { User } from '@supabase/supabase-js'
-import { supabase, isSupabaseEnabled } from '@/services/supabase'
+import { supabase, isSupabaseEnabled, backendHint } from '@/services/supabase'
 import { ruError } from '@/utils/errors'
 import type { Business } from '@/types'
 
@@ -54,7 +54,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function signUp(email: string, password: string): Promise<AuthResult> {
     error.value = ''
     if (!supabase) {
-      error.value = 'Бэкенд не подключён. Задайте Supabase-ключи в .env.local (см. docs/supabase-setup.md).'
+      error.value = backendHint()
       return { ok: false }
     }
     loading.value = true
@@ -80,7 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function signIn(email: string, password: string): Promise<AuthResult> {
     error.value = ''
     if (!supabase) {
-      error.value = 'Бэкенд не подключён. Задайте Supabase-ключи в .env.local (см. docs/supabase-setup.md).'
+      error.value = backendHint()
       return { ok: false }
     }
     loading.value = true

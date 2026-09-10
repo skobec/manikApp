@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
 import { useAuthStore } from '@/stores/authStore'
+import { backendHint } from '@/services/supabase'
 
 const router = useRouter()
 const route = useRoute()
@@ -45,7 +46,7 @@ async function submit() {
       <p class="auth-page__sub">Войдите, чтобы управлять записями и расписанием.</p>
 
       <p v-if="!auth.backendEnabled" class="auth-page__warn">
-        Бэкенд не подключён: задайте Supabase-ключи в .env.local (см. docs/supabase-setup.md).
+        {{ backendHint() }}
       </p>
 
       <form class="auth-page__form" @submit.prevent="submit">
